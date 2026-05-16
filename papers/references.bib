@@ -1,0 +1,149 @@
+% ============================================================
+%  Volatility Predictor — Academic References
+%  All papers cited in README.md and used to ground the
+%  models, loss functions, and hypothesis tests in this project.
+% ============================================================
+
+% ---- Volatility Modelling --------------------------------
+
+@article{bollerslev1986,
+  author  = {Bollerslev, Tim},
+  title   = {Generalized Autoregressive Conditional Heteroskedasticity},
+  journal = {Journal of Econometrics},
+  volume  = {31},
+  number  = {3},
+  pages   = {307--327},
+  year    = {1986},
+  note    = {Foundational GARCH(p,q) paper. Used as the baseline statistical model.}
+}
+
+@article{nelson1991,
+  author  = {Nelson, Daniel B.},
+  title   = {Conditional Heteroskedasticity in Asset Returns: A New Approach},
+  journal = {Econometrica},
+  volume  = {59},
+  number  = {2},
+  pages   = {347--370},
+  year    = {1991},
+  note    = {Introduces EGARCH, which captures the leverage effect (asymmetric vol response). Primary statistical model in this pipeline.}
+}
+
+@article{corsi2009,
+  author  = {Corsi, Fulvio},
+  title   = {A Simple Approximate Long-Memory Model of Realized Volatility},
+  journal = {Journal of Financial Econometrics},
+  volume  = {7},
+  number  = {2},
+  pages   = {174--196},
+  year    = {2009},
+  note    = {Introduces the HAR-RV model. Directly implemented as the third baseline in this pipeline.}
+}
+
+@article{andersen1998,
+  author  = {Andersen, Torben G. and Bollerslev, Tim},
+  title   = {Answering the Skeptics: Yes, Standard Volatility Models Do Provide Accurate Forecasts},
+  journal = {International Economic Review},
+  volume  = {39},
+  number  = {4},
+  pages   = {885--905},
+  year    = {1998},
+  note    = {Validates GARCH-class model forecasting accuracy using realized volatility as the benchmark.}
+}
+
+% ---- Loss Functions & Evaluation -------------------------
+
+@article{patton2011,
+  author  = {Patton, Andrew J.},
+  title   = {Volatility Forecast Comparison Using Imperfect Volatility Proxies},
+  journal = {Journal of Econometrics},
+  volume  = {160},
+  number  = {1},
+  pages   = {246--256},
+  year    = {2011},
+  note    = {Derives the QLIKE loss function used in the model comparison table. Proves QLIKE is robust to measurement error in realized vol.}
+}
+
+@article{hansen2005,
+  author  = {Hansen, Peter R. and Lunde, Asger},
+  title   = {A Forecast Comparison of Volatility Models: Does Anything Beat a GARCH(1,1)?},
+  journal = {Journal of Applied Econometrics},
+  volume  = {20},
+  number  = {7},
+  pages   = {873--889},
+  year    = {2005},
+  note    = {Comprehensive horse race of volatility models. Motivation for including EGARCH, HAR-RV, and ML models alongside the GARCH(1,1) baseline.}
+}
+
+% ---- Sentiment & Text Analysis ---------------------------
+
+@article{tetlock2007,
+  author  = {Tetlock, Paul C.},
+  title   = {Giving Content to Investor Sentiment: The Role of Media in the Stock Market},
+  journal = {Journal of Finance},
+  volume  = {62},
+  number  = {3},
+  pages   = {1139--1168},
+  year    = {2007},
+  note    = {Shows that media pessimism predicts downward pressure on market prices. Motivates the use of news sentiment as a predictive feature (H1 hypothesis design).}
+}
+
+@article{loughran2011,
+  author  = {Loughran, Tim and McDonald, Bill},
+  title   = {When Is a Liability Not a Liability? Textual Analysis, Dictionaries, and 10-Ks},
+  journal = {Journal of Finance},
+  volume  = {66},
+  number  = {1},
+  pages   = {35--65},
+  year    = {2011},
+  note    = {Introduces the Loughran-McDonald (LM) financial sentiment dictionary. Used in H7 (10-K risk language test) and EDA4 (sentiment model agreement).}
+}
+
+@inproceedings{hutto2014,
+  author    = {Hutto, C. J. and Gilbert, Eric},
+  title     = {{VADER}: A Parsimonious Rule-Based Model for Sentiment Analysis of Social Media Text},
+  booktitle = {Proceedings of the 8th International AAAI Conference on Weblogs and Social Media (ICWSM)},
+  year      = {2014},
+  note      = {Introduces the VADER sentiment lexicon. Primary sentiment source in this pipeline (fetch\_sentiment module and hypothesis tests H1, H3, H8).}
+}
+
+% ---- Leverage Effect & Stylized Facts --------------------
+
+@inproceedings{black1976,
+  author    = {Black, Fischer},
+  title     = {Studies of Stock Price Volatility Changes},
+  booktitle = {Proceedings of the 1976 Meetings of the American Statistical Association},
+  pages     = {177--181},
+  year      = {1976},
+  note      = {First description of the leverage effect. Motivates the EGARCH model choice and the H2 leverage-effect hypothesis test.}
+}
+
+@article{cont2001,
+  author  = {Cont, Rama},
+  title   = {Empirical Properties of Asset Returns: Stylized Facts and Statistical Issues},
+  journal = {Quantitative Finance},
+  volume  = {1},
+  number  = {2},
+  pages   = {223--236},
+  year    = {2001},
+  note    = {Catalogs the stylized facts of financial returns (fat tails, volatility clustering, leverage effect) that motivate the model and feature choices throughout this project.}
+}
+
+% ---- Machine Learning ------------------------------------
+
+@inproceedings{chen2016,
+  author    = {Chen, Tianqi and Guestrin, Carlos},
+  title     = {{XGBoost}: A Scalable Tree Boosting System},
+  booktitle = {Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining},
+  pages     = {785--794},
+  year      = {2016},
+  note      = {Foundational XGBoost paper. Used for both the standard and asymmetric-loss ML models in this pipeline.}
+}
+
+@inproceedings{lundberg2017,
+  author    = {Lundberg, Scott M. and Lee, Su-In},
+  title     = {A Unified Approach to Interpreting Model Predictions},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume    = {30},
+  year      = {2017},
+  note      = {Introduces SHAP (SHapley Additive exPlanations). Used to generate the XGBoost feature importance bar chart.}
+}
