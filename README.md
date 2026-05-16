@@ -1,5 +1,9 @@
 # Volatility Predictor — MU / Equity Vol Forecasting Pipeline
 
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue)
+![Models](https://img.shields.io/badge/models-EGARCH%20%7C%20HAR--RV%20%7C%20XGBoost%20%7C%20RF-green)
+
 > **Forecast realized volatility, detect spike regimes, and generate live scalping signals** using EGARCH, HAR-RV, XGBoost, and Random Forest — with VIX integration, VADER sentiment, SHAP explainability, and eight formal statistical hypothesis tests.
 
 ---
