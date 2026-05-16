@@ -1,0 +1,98 @@
+import pandas as pd
+import numpy as np
+import xgboost as xgb
+from sklearn.ensemble import RandomForestRegressor
+from src.features import FEATURE_COLS
+
+
+def _spike_weighted_obj(pred, dtrain):
+    """Custom XGBoost objective: 3x penalty when underestimating high-vol days (>0.5)."""
+    y_true = dtrain.get_label()
+    residual = pred - y_true
+    weight = np.where((y_true > 0.5) & (residual < 0), 3.0, 1.0)
+    return weight * residual, weight * np.ones_like(residual)
+
+
+class _BoosterWrapper:
+    """Wraps xgb.Booster to provide sklearn-compatible predict() and feature_importances_."""
+
+    def __init__(self, booster: xgb.Booster, n_features: int):
+        self.booster = booster
+        scores = booster.get_score(importance_type="gain")
+        raw = np.array([scores.get(f"f{i}", 0.0) for i in range(n_features)])
+        total = raw.sum()
+        self.feature_importances_ = raw / total if total > 0 else raw
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        return self.booster.predict(xgb.DMatrix(X))
+
+
+def train_and_predict(
+    feat_df: pd.DataFrame,
+    model_type: str = "xgboost",
+    train_size: float = 0.8,
+):
+    available = [c for c in FEATURE_COLS if c in feat_df.columns]
+    X = feat_df[available].values
+    y = feat_df["target"].values
+
+    split = int(len(X) * train_size)
+    X_train, X_test = X[:split], X[split:]
+    y_train = y[:split]
+
+    if model_type == "xgboost":
+        model = xgb.XGBRegressor(
+            n_estimators=300,
+            max_depth=4,
+            learning_rate=0.05,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            random_state=42,
+            verbosity=0,
+        )
+        model.fit(X_train, y_train)
+
+    elif model_type == "xgboost_asymmetric":
+        params = {
+            "max_depth": 4,
+            "learning_rate": 0.05,
+            "subsample": 0.8,
+            "colsample_bytree": 0.8,
+            "seed": 42,
+            "verbosity": 0,
+        }
+        dtrain = xgb.DMatrix(X_train, label=y_train)
+        booster = xgb.train(params, dtrain, num_boost_round=300, obj=_spike_weighted_obj)
+        model = _BoosterWrapper(booster, X_train.shape[1])
+
+    else:  # random_forest
+        model = RandomForestRegressor(
+            n_estimators=200,
+            max_depth=6,
+            min_samples_leaf=5,
+            random_state=42,
+            n_jobs=-1,
+        )
+        model.fit(X_train, y_train)
+
+    preds = model.predict(X_test)
+    pred_series = pd.Series(preds, index=feat_df.index[split:], name=f"{model_type}_forecast")
+    return pred_series, model, available  # also return feature list for SHAP
+
+
+def predict_latest(model, latest_row: pd.DataFrame) -> float:
+    available = [c for c in FEATURE_COLS if c in latest_row.columns]
+    X = latest_row[available].values
+    if isinstance(model, _BoosterWrapper):
+        return float(model.predict(X)[0])
+    return float(model.predict(X)[0])
+
+
+def feature_importance(model, feature_names: list) -> pd.DataFrame:
+    scores = model.feature_importances_
+    n = min(len(scores), len(feature_names))
+    return (
+        pd.DataFrame({"feature": feature_names[:n], "importance": scores[:n]})
+        .sort_values("importance", ascending=False)
+        .reset_index(drop=True)
+    )
