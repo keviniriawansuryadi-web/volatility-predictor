@@ -201,6 +201,20 @@ The `hypotheses.ipynb` notebook runs **8 formal statistical tests** on MU (2015�
 - **SHAP analysis** shows `vol_60d` dominates XGBoost predictions by 2×, confirming long-memory vol is the key signal; `vix_level` and `ret_skew_21d` also rank highly
 - **Live signal (May 2026):** Ensemble forward vol = 55.7% → **EXTREME regime**, tight stops essential
 
+### Forecast Chart
+
+![MU Volatility Comparison](docs/images/MU_volatility_comparison.png)
+
+*Top: all five model forecasts vs realized vol, with 90th-pct spike threshold (red dashed).  
+Middle: absolute error over time — EGARCH tracks spikes most closely.  
+Bottom: predicted vs realized scatter — stars mark spike days above the 90th percentile.*
+
+### SHAP Feature Importance
+
+![MU SHAP Feature Importance](docs/images/MU_shap_importance.png)
+
+*`vol_60d` dominates by 2×, confirming long-memory vol as the primary XGBoost signal. VIX level and 21-day return skew are the next most impactful features.*
+
 ---
 
 ## Academic References
