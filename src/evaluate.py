@@ -46,10 +46,11 @@ def _metrics(y_true: np.ndarray, y_pred: np.ndarray, name: str, spike_thresh: fl
 
 def compare_models(
     feat_df: pd.DataFrame,
-    forecasts: dict,          # {label: pd.Series}
+    forecasts: dict,                        # {label: pd.Series}
     train_size: float = 0.8,
     ticker: str = "TICKER",
     plot_dir: str = ".",
+    quantile_bands: dict | None = None,     # {'q10': Series, 'q50': Series, 'q90': Series}
 ) -> pd.DataFrame:
     """
     Evaluate all forecasts against the held-out test set and print a metrics table.
@@ -58,6 +59,17 @@ def compare_models(
     90th-pct vol days the model correctly flagged as high-vol).
     Saves a 3-panel forecast chart to outputs/plots/ and a metrics CSV to
     outputs/results/{ticker}/metrics.csv.
+
+    Parameters
+    ----------
+    feat_df        : Feature DataFrame with 'target' column.
+    forecasts      : Dict of {model_label: pd.Series of test-set predictions}.
+    train_size     : Fraction used for training (default 0.8).
+    ticker         : Ticker symbol for labelling saved files.
+    plot_dir       : Root output directory (outputs/ will be created inside).
+    quantile_bands : Optional dict from train_quantile_models(); if provided,
+                     a q10-q90 shaded uncertainty band is drawn on the time-series panel.
+
     Returns the metrics DataFrame indexed by model name.
     """
     split = int(len(feat_df) * train_size)
@@ -87,7 +99,13 @@ def compare_models(
     print(fmt.to_string())
     print(f"\n  [Spike threshold (90th pct): {spike_thresh:.1%} annualized vol]")
 
-    _plot_forecasts(test_df.index, y_true, aligned_preds, spike_thresh, ticker, plot_dir)
+    # Align quantile bands to test index
+    aligned_bands: dict | None = None
+    if quantile_bands:
+        aligned_bands = {k: v.reindex(test_df.index).values for k, v in quantile_bands.items()}
+
+    _plot_forecasts(test_df.index, y_true, aligned_preds, spike_thresh, ticker, plot_dir,
+                    quantile_bands=aligned_bands)
     _save_metrics(metrics_df, ticker, plot_dir)
 
     return metrics_df
@@ -106,7 +124,15 @@ def _save_metrics(metrics_df: pd.DataFrame, ticker: str, plot_dir: str = ".") ->
 # Plotting
 # ---------------------------------------------------------------------------
 
-def _plot_forecasts(index, y_true, aligned_preds, spike_thresh, ticker, plot_dir):
+def _plot_forecasts(index, y_true, aligned_preds, spike_thresh, ticker, plot_dir,
+                    quantile_bands: dict | None = None):
+    """
+    Save a 3-panel forecast chart (time series, absolute error, predicted vs realized).
+
+    When `quantile_bands` is provided (dict with keys 'q10', 'q50', 'q90'), draws a
+    shaded uncertainty band on the time-series panel from the q10 to q90 quantile
+    regression forecasts, helping visualise spike-day coverage.
+    """
     out_dir = Path(plot_dir) / "outputs" / "plots"
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -119,6 +145,16 @@ def _plot_forecasts(index, y_true, aligned_preds, spike_thresh, ticker, plot_dir
     ax = axes[0]
     ax.plot(index, y_true, label="Realized Vol", color="black", linewidth=1.5)
     ax.axhline(spike_thresh, color="red", linestyle="--", linewidth=0.8, alpha=0.6, label="90th pct")
+
+    # Draw quantile band before the model lines so it sits underneath
+    if quantile_bands and "q10" in quantile_bands and "q90" in quantile_bands:
+        q10 = quantile_bands["q10"]
+        q90 = quantile_bands["q90"]
+        ax.fill_between(index, q10, q90, alpha=0.15, color="teal", label="q10–q90 band")
+        if "q50" in quantile_bands:
+            ax.plot(index, quantile_bands["q50"], color="teal", alpha=0.6,
+                    linewidth=1, linestyle="--", label="q50 (median)")
+
     for (name, yp), color in zip(aligned_preds.items(), colors):
         ax.plot(index, yp, label=name, color=color, alpha=0.7)
     ax.set_title(f"{ticker} — Volatility Forecast vs Realized (Test Set)")

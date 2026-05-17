@@ -7,7 +7,7 @@ from src.sentiment import fetch_sentiment, fetch_wsb_sentiment
 from src.features import build_features, latest_feature_row, FEATURE_COLS
 from src.garch_model import rolling_garch_forecast, garch_latest_forecast, garch_in_sample_vol
 from src.har_model import har_rv_forecast
-from src.ml_model import train_and_predict, predict_latest, feature_importance
+from src.ml_model import train_and_predict, predict_latest, feature_importance, train_quantile_models
 from src.evaluate import compare_models, plot_shap
 from src.hypothesis import spike_sentiment_test, print_hypothesis_results
 from config import TICKERS, DEFAULT_START, DEFAULT_END, DEFAULT_HORIZON, DEFAULT_TRAIN_SIZE, DEFAULT_GARCH_TYPE
@@ -110,6 +110,9 @@ def run_ticker(
     rf_preds, rf_model, _ = train_and_predict(
         feat_df, model_type="random_forest", train_size=train_size)
 
+    print("Training quantile regression models (q10 / q50 / q90)...")
+    quantile_bands = train_quantile_models(feat_df, train_size=train_size)
+
     # 5. Feature importance
     print("\n--- XGBoost Feature Importance (top 8) ---")
     print(feature_importance(xgb_model, xgb_features).head(8).to_string(index=False))
@@ -125,6 +128,7 @@ def run_ticker(
     metrics_df = compare_models(
         feat_df, forecasts=forecasts,
         train_size=train_size, ticker=ticker, plot_dir=plot_dir,
+        quantile_bands=quantile_bands,
     )
 
     # 7. SHAP plot

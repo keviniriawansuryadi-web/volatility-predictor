@@ -1,7 +1,8 @@
 import pandas as pd
 import numpy as np
 import xgboost as xgb
-from sklearn.ensemble import RandomForestRegressor
+import warnings
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from src.features import FEATURE_COLS
 
 
@@ -103,6 +104,61 @@ def train_and_predict(
     preds = model.predict(X_test)
     pred_series = pd.Series(preds, index=feat_df.index[split:], name=f"{model_type}_forecast")
     return pred_series, model, available  # also return feature list for SHAP
+
+
+def train_quantile_models(
+    feat_df: pd.DataFrame,
+    train_size: float = 0.8,
+    quantiles: tuple = (0.10, 0.50, 0.90),
+    n_estimators: int = 200,
+) -> dict[str, pd.Series]:
+    """
+    Train a GradientBoostingRegressor for each quantile and return test-set forecasts.
+
+    Quantile regression provides a probabilistic band around the point forecast:
+      - q10 is the lower bound (model expects vol to stay above this ~90% of the time)
+      - q50 is the median forecast (robust to outliers, a better central estimate)
+      - q90 is the upper bound (early warning for spike days)
+
+    Skips gracefully on any error and returns an empty dict entry for that quantile
+    rather than crashing the full pipeline.
+
+    Parameters
+    ----------
+    feat_df      : Feature DataFrame with a 'target' column (output of build_features).
+    train_size   : Fraction of data used for training (default 0.8).
+    quantiles    : Tuple of quantiles to fit (default (0.10, 0.50, 0.90)).
+    n_estimators : Number of boosting rounds per quantile (default 200).
+
+    Returns a dict mapping 'q10'/'q50'/'q90' → pd.Series of test-set predictions.
+    """
+    available = [c for c in FEATURE_COLS if c in feat_df.columns]
+    X = feat_df[available].values
+    y = feat_df["target"].values
+    split = int(len(X) * train_size)
+    X_train, X_test = X[:split], X[split:]
+    y_train = y[:split]
+    test_index = feat_df.index[split:]
+
+    result: dict[str, pd.Series] = {}
+    for q in quantiles:
+        key = f"q{int(q * 100):02d}"
+        try:
+            model = GradientBoostingRegressor(
+                loss="quantile",
+                alpha=q,
+                n_estimators=n_estimators,
+                max_depth=4,
+                learning_rate=0.05,
+                subsample=0.8,
+                random_state=42,
+            )
+            model.fit(X_train, y_train)
+            preds = model.predict(X_test)
+            result[key] = pd.Series(preds, index=test_index, name=f"quantile_{key}")
+        except Exception as exc:
+            warnings.warn(f"[quantile] {key} model failed: {exc} — skipping.")
+    return result
 
 
 def predict_latest(model, latest_row: pd.DataFrame) -> float:
