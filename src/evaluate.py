@@ -237,6 +237,111 @@ def _plot_forecasts(index, y_true, aligned_preds, spike_thresh, ticker, plot_dir
     print(f"Plot saved: {out}")
 
 
+def plot_shap_worst_prediction(
+    model,
+    X_test: np.ndarray,
+    y_test: np.ndarray,
+    feature_names: list,
+    ticker: str,
+    plot_dir: str,
+) -> dict:
+    """
+    Generate a SHAP waterfall plot for the single worst XGBoost prediction.
+
+    The 'worst' prediction is defined as the day with the largest absolute
+    underestimation error (pred < actual), since underestimating vol is the
+    riskier failure mode for a trader.  The waterfall chart decomposes that
+    single prediction into per-feature SHAP contributions, showing exactly
+    which features pushed the model toward its incorrect low forecast.
+
+    Saves the chart to outputs/plots/{ticker}_shap_worst_prediction.png and
+    returns a dict with the date index, error magnitude, and top 3 features
+    by absolute SHAP value for use in notebook narratives.
+
+    Parameters
+    ----------
+    model        : Fitted XGBoost model (XGBRegressor or _BoosterWrapper).
+    X_test       : Test feature matrix (n_samples × n_features).
+    y_test       : Realized vol for the test set (n_samples,).
+    feature_names: List of feature column names matching X_test columns.
+    ticker       : Ticker symbol used in file naming and titles.
+    plot_dir     : Root output directory.
+
+    Returns a summary dict: {'worst_idx', 'error', 'actual', 'pred', 'top_features'}.
+    """
+    try:
+        import shap
+
+        if hasattr(model, "get_booster"):
+            underlying = model.get_booster()
+        elif hasattr(model, "booster"):
+            underlying = model.booster
+        else:
+            underlying = model
+
+        explainer = shap.TreeExplainer(underlying)
+        shap_vals = explainer.shap_values(X_test)   # (n_samples, n_features)
+
+        preds = model.predict(X_test)
+        # Focus on underestimation: error is positive when model guesses too low
+        under_error = y_test - preds
+        worst_idx = int(np.argmax(under_error))
+
+        actual = float(y_test[worst_idx])
+        pred   = float(preds[worst_idx])
+        error  = float(under_error[worst_idx])
+
+        shap_row = shap_vals[worst_idx]        # (n_features,)
+        n = min(len(shap_row), len(feature_names))
+
+        # Sort features by absolute SHAP contribution for the worst row
+        order   = np.argsort(np.abs(shap_row[:n]))[::-1]
+        top_feats = [(feature_names[i], float(shap_row[i])) for i in order[:10]]
+
+        # Build waterfall-style bar chart (matplotlib, no shap.plots dependency)
+        top_n    = min(10, n)
+        top_names = [feature_names[i] for i in order[:top_n]]
+        top_vals  = [shap_row[i] for i in order[:top_n]]
+        # Reverse so most important is at the top
+        top_names = top_names[::-1]
+        top_vals  = top_vals[::-1]
+
+        colors = ["#d62728" if v < 0 else "#1f77b4" for v in top_vals]
+
+        fig, ax = plt.subplots(figsize=(9, 6))
+        ax.barh(top_names, top_vals, color=colors)
+        ax.axvline(0, color="black", linewidth=0.8)
+        ax.set_xlabel("SHAP value (contribution to prediction)")
+        ax.set_title(
+            f"{ticker} — Worst Underestimation\n"
+            f"Actual: {actual:.1%}  Predicted: {pred:.1%}  Error: +{error:.1%}"
+        )
+        ax.grid(axis="x", alpha=0.3)
+        plt.tight_layout()
+
+        out_dir = Path(plot_dir) / "outputs" / "plots"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out = out_dir / f"{ticker}_shap_worst_prediction.png"
+        plt.savefig(out, dpi=150)
+        plt.close()
+        print(f"SHAP worst-prediction plot saved: {out}")
+
+        return {
+            "worst_idx":   worst_idx,
+            "actual":      actual,
+            "pred":        pred,
+            "error":       error,
+            "top_features": top_feats[:3],
+        }
+
+    except ImportError:
+        print("  [SHAP] shap not installed — skipping worst-prediction plot.")
+        return {}
+    except Exception as exc:
+        print(f"  [SHAP] Worst-prediction plot error: {exc}")
+        return {}
+
+
 def plot_shap(model, X_test: np.ndarray, feature_names: list, ticker: str, plot_dir: str) -> None:
     try:
         import shap

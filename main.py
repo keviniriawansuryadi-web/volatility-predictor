@@ -11,7 +11,7 @@ from src.ml_model import (
     train_and_predict, predict_latest, feature_importance,
     train_quantile_models, train_stacking_ensemble,
 )
-from src.evaluate import compare_models, plot_shap, save_model_comparison
+from src.evaluate import compare_models, plot_shap, save_model_comparison, plot_shap_worst_prediction
 from src.hypothesis import (
     spike_sentiment_test, print_hypothesis_results,
     disagreement_vol_test, print_disagreement_results,
@@ -154,10 +154,14 @@ def run_ticker(
     # 7. Full model comparison CSV
     save_model_comparison(metrics_df, ticker=ticker, plot_dir=plot_dir)
 
-    # 8. SHAP plot
+    # 9. SHAP plots
     split = int(len(feat_df) * train_size)
     X_test = feat_df[xgb_features].values[split:]
+    y_test = feat_df["target"].values[split:]
     plot_shap(xgb_model, X_test, xgb_features, ticker, plot_dir)
+    worst_shap = plot_shap_worst_prediction(
+        xgb_model, X_test, y_test, xgb_features, ticker, plot_dir
+    )
 
     # 8. Hypothesis tests
     hyp_result = spike_sentiment_test(feat_df)
