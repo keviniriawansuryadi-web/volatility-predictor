@@ -18,6 +18,7 @@ from src.hypothesis import (
     spike_sentiment_test, print_hypothesis_results,
     disagreement_vol_test, print_disagreement_results,
 )
+from src.regime import analyze_regime_persistence, enrich_live_signal_with_regime
 from config import TICKERS, DEFAULT_START, DEFAULT_END, DEFAULT_HORIZON, DEFAULT_TRAIN_SIZE, DEFAULT_GARCH_TYPE
 
 
@@ -172,6 +173,9 @@ def run_ticker(
     disagree_result = disagreement_vol_test(feat_df, garch_preds, xgb_preds)
     print_disagreement_results(disagree_result)
 
+    print("\nAnalysing vol regime persistence...")
+    regime_result = analyze_regime_persistence(df, ticker)
+
     # 9. Live forward signal
     print(f"\n{'='*60}")
     print(f"  LIVE SIGNAL -- {ticker}  ({horizon}-day forward vol)")
@@ -228,11 +232,11 @@ def run_ticker(
         realized_vol=float(realized_vol),
         horizon=horizon,
         forecasts={
-            "xgboost":      float(xgb_now),
+            "xgboost":        float(xgb_now),
             "xgb_asymmetric": float(xgb_asym_now),
-            "random_forest": float(rf_now),
+            "random_forest":  float(rf_now),
             garch_type.lower(): float(garch_now),
-            "ensemble":     float(ensemble),
+            "ensemble":       float(ensemble),
         },
         regime=_regime(ensemble),
         disagreement={
@@ -242,6 +246,7 @@ def run_ticker(
             "flag":     disagree_flag,
         },
         sentiment_h1_significant=bool(hyp_result.get("significant", False)),
+        regime_result=regime_result,
         plot_dir=plot_dir,
     )
 
@@ -258,6 +263,7 @@ def _save_live_signal(
     regime: str,
     disagreement: dict,
     sentiment_h1_significant: bool,
+    regime_result: dict | None = None,
     plot_dir: str = ".",
 ) -> None:
     """
@@ -294,10 +300,19 @@ def _save_live_signal(
             ),
         },
     }
+    if regime_result:
+        from src.regime import enrich_live_signal_with_regime
+        payload = enrich_live_signal_with_regime(payload, regime_result)
 
     out = out_dir / f"live_signal_{ticker}_{latest_date}.json"
     out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(f"Live signal saved: {out}")
+
+
+def _enrich_signal_regime(payload: dict, regime_result: dict) -> dict:
+    """Inject regime persistence block into the live signal payload."""
+    from src.regime import enrich_live_signal_with_regime
+    return enrich_live_signal_with_regime(payload, regime_result)
 
 
 def main():
