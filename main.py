@@ -14,12 +14,17 @@ from config import TICKERS, DEFAULT_START, DEFAULT_END, DEFAULT_HORIZON, DEFAULT
 
 
 def parse_args():
+    today          = date.today().isoformat()
+    five_years_ago = (date.today() - timedelta(days=5 * 365)).isoformat()
+
     p = argparse.ArgumentParser(description="Stock volatility predictor: GARCH vs. ML")
     p.add_argument("--ticker",      default="SPY",  help="Single ticker to analyse")
     p.add_argument("--all-tickers", action="store_true",
                    help="Run on all tickers defined in config.TICKERS")
-    p.add_argument("--start",       default=DEFAULT_START)
-    p.add_argument("--end",         default=DEFAULT_END)
+    p.add_argument("--start",       default=five_years_ago,
+                   help="Start date (default: 5 years ago)")
+    p.add_argument("--end",         default=today,
+                   help="End date (default: today)")
     p.add_argument("--horizon",     type=int,   default=DEFAULT_HORIZON)
     p.add_argument("--train-size",  type=float, default=DEFAULT_TRAIN_SIZE)
     p.add_argument("--garch-type",  default=DEFAULT_GARCH_TYPE, choices=["GARCH", "EGARCH"])

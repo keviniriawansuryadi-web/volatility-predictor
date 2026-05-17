@@ -33,9 +33,10 @@ SECTOR_COLORS = {
     "Consumer/Tech":  "#f39c12",
 }
 
-# Default pipeline settings (used by main.py and notebooks)
+# Default pipeline settings used by notebooks (fixed for reproducibility).
+# main.py CLI uses dynamic defaults: start=5 years ago, end=today.
 DEFAULT_START      = "2019-01-01"
-DEFAULT_END        = "2024-12-31"
+DEFAULT_END        = "2024-12-31"   # notebooks use this fixed window
 DEFAULT_HORIZON    = 5
 DEFAULT_TRAIN_SIZE = 0.8
 DEFAULT_GARCH_TYPE = "EGARCH"
