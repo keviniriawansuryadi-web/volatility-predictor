@@ -19,6 +19,9 @@ from src.hypothesis import (
     disagreement_vol_test, print_disagreement_results,
 )
 from src.regime import analyze_regime_persistence, enrich_live_signal_with_regime
+from src.disagree_backtest import (
+    backtest_disagreement_signal, compute_live_disagreement_percentile,
+)
 from config import TICKERS, DEFAULT_START, DEFAULT_END, DEFAULT_HORIZON, DEFAULT_TRAIN_SIZE, DEFAULT_GARCH_TYPE
 
 
@@ -173,6 +176,15 @@ def run_ticker(
     disagree_result = disagreement_vol_test(feat_df, garch_preds, xgb_preds)
     print_disagreement_results(disagree_result)
 
+    # Disagreement signal backtest (hit rate / vol lift / FPR)
+    split = int(len(feat_df) * train_size)
+    rv_test = feat_df["target"].iloc[split:]
+    disagree_backtest = backtest_disagreement_signal(
+        garch_preds=garch_preds,
+        ml_preds=xgb_preds,
+        realized_vol=rv_test,
+    )
+
     print("\nAnalysing vol regime persistence...")
     regime_result = analyze_regime_persistence(df, ticker)
 
@@ -193,13 +205,17 @@ def run_ticker(
     garch_now    = garch_latest_forecast(df["log_return"], horizon, garch_type)
     ensemble     = float(np.nanmean([xgb_now, xgb_asym_now, rf_now, garch_now]))
 
-    # EGARCH-ML disagreement on most recent test window
+    # EGARCH-ML disagreement on most recent test window + percentile enrichment
     if disagree_result.get("available") and "disagreement_series" in disagree_result:
         last_disagree = float(disagree_result["disagreement_series"].iloc[-1])
         disagree_flag = last_disagree >= disagree_result["disagreement_cutoff"]
+        live_disagree_pct = compute_live_disagreement_percentile(
+            last_disagree, disagree_result["disagreement_series"]
+        )
     else:
         last_disagree = float("nan")
         disagree_flag = False
+        live_disagree_pct = None
 
     def _regime(v: float) -> str:
         if v > 0.35: return "EXTREME  -- Very high risk/reward, tight stops essential"
@@ -240,10 +256,20 @@ def run_ticker(
         },
         regime=_regime(ensemble),
         disagreement={
-            "value":    float(last_disagree) if not np.isnan(last_disagree) else None,
-            "cutoff":   float(disagree_result.get("disagreement_cutoff", float("nan")))
-                        if disagree_result.get("available") else None,
-            "flag":     disagree_flag,
+            "value":       float(last_disagree) if not np.isnan(last_disagree) else None,
+            "cutoff":      float(disagree_result.get("disagreement_cutoff", float("nan")))
+                           if disagree_result.get("available") else None,
+            "flag":        disagree_flag,
+            "live_pct":    live_disagree_pct,
+            "backtest": {
+                "hit_rate":           round(disagree_backtest["hit_rate"], 3)
+                                      if disagree_backtest.get("available") else None,
+                "false_positive_rate": round(disagree_backtest["false_positive_rate"], 3)
+                                       if disagree_backtest.get("available") else None,
+                "vol_lift":           round(disagree_backtest["vol_lift"], 3)
+                                      if disagree_backtest.get("available") else None,
+                "interpretation":     disagree_backtest.get("interpretation"),
+            },
         },
         sentiment_h1_significant=bool(hyp_result.get("significant", False)),
         regime_result=regime_result,
