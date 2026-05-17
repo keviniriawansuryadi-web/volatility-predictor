@@ -120,6 +120,43 @@ def _save_metrics(metrics_df: pd.DataFrame, ticker: str, plot_dir: str = ".") ->
     print(f"Metrics saved: {out}")
 
 
+def save_model_comparison(
+    metrics_df: pd.DataFrame,
+    ticker: str,
+    plot_dir: str = ".",
+) -> None:
+    """
+    Save a full model-comparison CSV for the given ticker.
+
+    Writes `outputs/results/{ticker}/{ticker}_model_comparison.csv` with
+    one row per model and all evaluation metrics (RMSE, MAE, QLIKE, Corr,
+    Spike_Acc).  Also appends a 'winner' column that marks the model with
+    the lowest QLIKE loss (most relevant for volatility forecasting accuracy
+    under spike-penalisation).
+
+    The file is overwritten on each call so stale results from prior runs
+    do not accumulate.
+
+    Parameters
+    ----------
+    metrics_df : DataFrame indexed by model name (output of compare_models).
+    ticker     : Ticker symbol used in the filename and 'ticker' column.
+    plot_dir   : Root output directory.
+    """
+    out_dir = Path(plot_dir) / "outputs" / "results" / ticker
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    comparison = metrics_df.copy().reset_index()
+    comparison.insert(0, "ticker", ticker)
+
+    best_qlike_model = comparison.loc[comparison["QLIKE"].idxmin(), "model"]
+    comparison["winner"] = comparison["model"] == best_qlike_model
+
+    out = out_dir / f"{ticker}_model_comparison.csv"
+    comparison.to_csv(out, index=False)
+    print(f"Model comparison saved: {out}  (best QLIKE: {best_qlike_model})")
+
+
 # ---------------------------------------------------------------------------
 # Plotting
 # ---------------------------------------------------------------------------
