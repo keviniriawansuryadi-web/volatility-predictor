@@ -5,6 +5,11 @@ streamlit>=1.35
 yfinance>=0.2.40
 pandas>=2.0
 numpy>=1.24
+requests>=2.31
+
+# Scraping
+feedparser>=6.0
+beautifulsoup4>=4.12
 
 # Volatility models
 arch>=6.0
