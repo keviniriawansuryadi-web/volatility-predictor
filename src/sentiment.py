@@ -134,6 +134,71 @@ def _neutral_series(index: pd.DatetimeIndex) -> pd.Series:
     return pd.Series(0.0, index=index, name="sentiment")
 
 
+# ─── WSB sentiment ─────────────────────────────────────────────────────────────
+
+def fetch_wsb_sentiment(
+    ticker: str,
+    index: pd.DatetimeIndex,
+    impute_window: int = 5,
+) -> pd.Series:
+    """
+    Fetch Reddit r/wallstreetbets sentiment for `ticker` aligned to `index`.
+
+    Calls scrapers.scraper_news.scrape_wsb_sentiment() which returns VADER
+    compound scores weighted by log(1 + upvotes) per day.  The result is
+    reindexed to the trading calendar and missing days are imputed with a
+    rolling `impute_window`-day median — never zero, because zero is a real
+    neutral signal, not an absence of data.
+
+    Parameters
+    ----------
+    ticker        : ticker symbol (upper-cased internally).
+    index         : DatetimeIndex of trading days to align to.
+    impute_window : window for rolling median imputation (default 5).
+
+    Returns a Series in [-1, 1] indexed to `index`, named 'wsb_sentiment'.
+    An all-zero neutral series is returned only when the scraper errors out
+    or returns no posts.
+    """
+    try:
+        from scrapers.scraper_news import scrape_wsb_sentiment
+    except Exception as exc:
+        warnings.warn(f"[wsb_sentiment] Scraper import failed: {exc}")
+        return pd.Series(0.0, index=index, name="wsb_sentiment")
+
+    try:
+        daily = scrape_wsb_sentiment(ticker)
+    except Exception as exc:
+        warnings.warn(f"[wsb_sentiment] scrape_wsb_sentiment({ticker}) failed: {exc}")
+        return pd.Series(0.0, index=index, name="wsb_sentiment")
+
+    if daily.empty:
+        warnings.warn(
+            f"[wsb_sentiment] {ticker}: no WSB posts found — returning neutral series."
+        )
+        return pd.Series(0.0, index=index, name="wsb_sentiment")
+
+    # Align to tz-naive trading index
+    if daily.index.tz is not None:
+        daily.index = daily.index.tz_localize(None)
+
+    aligned = daily.reindex(index)
+
+    rolling_med = aligned.rolling(impute_window, min_periods=1).median()
+    aligned = aligned.where(aligned.notna(), rolling_med)
+    aligned = aligned.fillna(0.0)   # only if the very first window has no data
+
+    aligned.name = "wsb_sentiment"
+
+    n_real = daily.reindex(index).notna().sum()
+    n_imputed = len(index) - n_real
+    print(
+        f"  [wsb_sentiment] {ticker}: {n_real} trading days with real WSB scores, "
+        f"{n_imputed} imputed via rolling-{impute_window}d median."
+    )
+    return aligned
+
+
 # ─── audit function ────────────────────────────────────────────────────────────
 
 def audit_sentiment_coverage(df: pd.DataFrame, ticker: str) -> pd.DataFrame:

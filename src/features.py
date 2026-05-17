@@ -20,6 +20,8 @@ FEATURE_COLS = [
     "vix_level", "vix_change",
     # Sentiment (populated when news data is available)
     "sentiment_3d", "sentiment_lag1", "sentiment_lag2", "sentiment_lag3",
+    # Reddit WSB sentiment (populated when scraper returns data)
+    "wsb_sentiment_3d", "wsb_sentiment_lag1",
     # Vol lags
     "vol_lag1", "vol_lag2", "vol_lag3",
     # GARCH fitted vol (hybrid feature)
@@ -81,6 +83,11 @@ def _add_features(df: pd.DataFrame) -> pd.DataFrame:
         feat["sentiment_3d"] = feat["sentiment"].rolling(3).mean()
         for lag in [1, 2, 3]:
             feat[f"sentiment_lag{lag}"] = feat["sentiment"].shift(lag)
+
+    # WSB sentiment features (when wsb_sentiment column exists in df)
+    if "wsb_sentiment" in feat.columns:
+        feat["wsb_sentiment_3d"]   = feat["wsb_sentiment"].rolling(3).mean()
+        feat["wsb_sentiment_lag1"] = feat["wsb_sentiment"].shift(1)
 
     return feat
 

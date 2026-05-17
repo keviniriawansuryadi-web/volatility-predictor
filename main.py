@@ -3,7 +3,7 @@ import numpy as np
 from datetime import date, timedelta
 
 from src.data_loader import load_stock_data, load_vix_data
-from src.sentiment import fetch_sentiment
+from src.sentiment import fetch_sentiment, fetch_wsb_sentiment
 from src.features import build_features, latest_feature_row, FEATURE_COLS
 from src.garch_model import rolling_garch_forecast, garch_latest_forecast, garch_in_sample_vol
 from src.har_model import har_rv_forecast
@@ -75,6 +75,9 @@ def run_ticker(
 
     print("\nFetching VADER sentiment from news...")
     df["sentiment"] = fetch_sentiment(ticker, df.index)
+
+    print("\nFetching Reddit WSB sentiment...")
+    df["wsb_sentiment"] = fetch_wsb_sentiment(ticker, df.index)
 
     print(f"\nFitting {garch_type} in-sample for hybrid feature...")
     df["garch_vol"] = garch_in_sample_vol(df["log_return"], model_type=garch_type)
