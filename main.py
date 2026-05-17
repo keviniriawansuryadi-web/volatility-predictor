@@ -12,7 +12,10 @@ from src.ml_model import (
     train_quantile_models, train_stacking_ensemble,
 )
 from src.evaluate import compare_models, plot_shap
-from src.hypothesis import spike_sentiment_test, print_hypothesis_results
+from src.hypothesis import (
+    spike_sentiment_test, print_hypothesis_results,
+    disagreement_vol_test, print_disagreement_results,
+)
 from config import TICKERS, DEFAULT_START, DEFAULT_END, DEFAULT_HORIZON, DEFAULT_TRAIN_SIZE, DEFAULT_GARCH_TYPE
 
 
@@ -153,9 +156,12 @@ def run_ticker(
     X_test = feat_df[xgb_features].values[split:]
     plot_shap(xgb_model, X_test, xgb_features, ticker, plot_dir)
 
-    # 8. Hypothesis test
+    # 8. Hypothesis tests
     hyp_result = spike_sentiment_test(feat_df)
     print_hypothesis_results(hyp_result)
+
+    disagree_result = disagreement_vol_test(feat_df, garch_preds, xgb_preds)
+    print_disagreement_results(disagree_result)
 
     # 9. Live forward signal
     print(f"\n{'='*60}")
@@ -173,6 +179,14 @@ def run_ticker(
     print(f"  Fitting {garch_type} on full history for forward forecast...")
     garch_now    = garch_latest_forecast(df["log_return"], horizon, garch_type)
     ensemble     = float(np.nanmean([xgb_now, xgb_asym_now, rf_now, garch_now]))
+
+    # EGARCH-ML disagreement on most recent test window
+    if disagree_result.get("available") and "disagreement_series" in disagree_result:
+        last_disagree = float(disagree_result["disagreement_series"].iloc[-1])
+        disagree_flag = last_disagree >= disagree_result["disagreement_cutoff"]
+    else:
+        last_disagree = float("nan")
+        disagree_flag = False
 
     def _regime(v: float) -> str:
         if v > 0.35: return "EXTREME  -- Very high risk/reward, tight stops essential"
@@ -192,6 +206,9 @@ def run_ticker(
     print(f"  -- Ensemble: {ensemble:.1%}")
     print(f"")
     print(f"  REGIME: {_regime(ensemble)}")
+    if not np.isnan(last_disagree):
+        flag_txt = "HIGH DISAGREEMENT -- elevated vol risk" if disagree_flag else "low disagreement"
+        print(f"  EGARCH-ML disagree: {last_disagree:.3f}  [{flag_txt}]")
     print(f"{'='*60}\n")
 
     return {"ticker": ticker, "metrics_df": metrics_df, "hyp_result": hyp_result}

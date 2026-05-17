@@ -56,6 +56,126 @@ def spike_sentiment_test(feat_df: pd.DataFrame, lookback: int = 3) -> dict:
     }
 
 
+def disagreement_vol_test(
+    feat_df: pd.DataFrame,
+    garch_preds: pd.Series,
+    ml_preds: pd.Series,
+    threshold_pct: float = 0.20,
+) -> dict:
+    """
+    H2: High EGARCH-ML disagreement days predict above-median realized vol.
+
+    Disagreement is defined as the absolute relative difference between the
+    EGARCH and XGBoost forecasts, normalised by their mean:
+
+        disagreement = |egarch - ml| / ((|egarch| + |ml|) / 2 + epsilon)
+
+    Days where disagreement exceeds the `threshold_pct` percentile of all
+    disagreement scores are classed as 'high-disagreement' days.
+
+    Test: one-sided Mann-Whitney U (high-disagreement vol > low-disagreement vol).
+
+    When the two models disagree strongly, at least one is surprised by the
+    regime — this uncertainty itself is a signal that realized vol will be
+    elevated relative to the calm baseline.
+
+    Parameters
+    ----------
+    feat_df         : Feature DataFrame with a 'target' column.
+    garch_preds     : pd.Series of EGARCH test-set forecasts.
+    ml_preds        : pd.Series of XGBoost test-set forecasts.
+    threshold_pct   : Percentile cutoff defining 'high disagreement' (default 0.20
+                      = top 80th percentile of disagreement scores).
+
+    Returns a result dict suitable for printing via print_disagreement_results().
+    """
+    common_index = feat_df.index.intersection(garch_preds.index).intersection(ml_preds.index)
+    if len(common_index) < 20:
+        return {
+            "available": False,
+            "reason": f"Only {len(common_index)} overlapping rows — need >= 20.",
+        }
+
+    y_true = feat_df.loc[common_index, "target"]
+    eg = garch_preds.reindex(common_index)
+    ml = ml_preds.reindex(common_index)
+
+    denom = (eg.abs() + ml.abs()) / 2 + 1e-8
+    disagreement = (eg - ml).abs() / denom
+
+    cutoff = disagreement.quantile(1.0 - threshold_pct)
+    high_mask = disagreement >= cutoff
+
+    high_vol = y_true[high_mask].dropna()
+    low_vol  = y_true[~high_mask].dropna()
+
+    if len(high_vol) < 5 or len(low_vol) < 5:
+        return {
+            "available": False,
+            "reason": (
+                f"Insufficient samples: high_disagreement n={len(high_vol)}, "
+                f"low_disagreement n={len(low_vol)}. Need >= 5 each."
+            ),
+        }
+
+    u_stat, p_value = stats.mannwhitneyu(high_vol, low_vol, alternative="greater")
+
+    pooled_std = np.sqrt((high_vol.std() ** 2 + low_vol.std() ** 2) / 2)
+    cohens_d = (high_vol.mean() - low_vol.mean()) / (pooled_std + 1e-10)
+
+    return {
+        "available":            True,
+        "threshold_percentile": threshold_pct,
+        "disagreement_cutoff":  float(cutoff),
+        "n_high":               int(high_mask.sum()),
+        "n_low":                int((~high_mask).sum()),
+        "high_mean_vol":        float(high_vol.mean()),
+        "low_mean_vol":         float(low_vol.mean()),
+        "mann_whitney_u":       float(u_stat),
+        "p_value":              float(p_value),
+        "cohens_d":             float(cohens_d),
+        "significant":          p_value < 0.05,
+        "disagreement_series":  disagreement,  # for adding as feature / signal
+    }
+
+
+def print_disagreement_results(result: dict) -> None:
+    """Pretty-print the output of disagreement_vol_test()."""
+    print("\n" + "=" * 60)
+    print("  HYPOTHESIS TEST: EGARCH-ML Disagreement vs Realized Vol")
+    print("=" * 60)
+
+    if not result.get("available"):
+        print(f"  Result: INCONCLUSIVE\n  Reason: {result.get('reason')}")
+        print("=" * 60)
+        return
+
+    print(f"  H2: High EGARCH-ML disagreement days have elevated realized vol")
+    print(f"  Disagreement cutoff (top {result['threshold_percentile']:.0%}): "
+          f"{result['disagreement_cutoff']:.4f}")
+    print(f"  High-disagreement (n={result['n_high']}): "
+          f"mean vol = {result['high_mean_vol']:.1%}")
+    print(f"  Low-disagreement  (n={result['n_low']}): "
+          f"mean vol = {result['low_mean_vol']:.1%}")
+    print(f"  Mann-Whitney U = {result['mann_whitney_u']:.1f}  |  "
+          f"p-value = {result['p_value']:.4f}  |  "
+          f"Cohen's d = {result['cohens_d']:.3f}")
+
+    if result["significant"]:
+        magnitude = (
+            "large" if abs(result["cohens_d"]) > 0.8
+            else "medium" if abs(result["cohens_d"]) > 0.5
+            else "small"
+        )
+        print(f"\n  REJECT H0 (p < 0.05). High EGARCH-ML disagreement days have")
+        print(f"  significantly higher realized vol (effect: {magnitude}).")
+    else:
+        print(f"\n  FAIL TO REJECT H0 (p >= 0.05). No significant vol difference")
+        print(f"  between high- and low-disagreement days.")
+
+    print("=" * 60)
+
+
 def print_hypothesis_results(result: dict) -> None:
     print("\n" + "=" * 60)
     print("  HYPOTHESIS TEST: Sentiment Before Volatility Spikes")
