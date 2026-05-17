@@ -79,8 +79,18 @@ def compare_models(
     print(f"\n  [Spike threshold (90th pct): {spike_thresh:.1%} annualized vol]")
 
     _plot_forecasts(test_df.index, y_true, aligned_preds, spike_thresh, ticker, plot_dir)
+    _save_metrics(metrics_df, ticker, plot_dir)
 
     return metrics_df
+
+
+def _save_metrics(metrics_df: pd.DataFrame, ticker: str, plot_dir: str = ".") -> None:
+    """Persist per-ticker metrics to outputs/results/{ticker}/metrics.csv."""
+    out_dir = Path(plot_dir) / "outputs" / "results" / ticker
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / "metrics.csv"
+    metrics_df.to_csv(out)
+    print(f"Metrics saved: {out}")
 
 
 # ---------------------------------------------------------------------------
