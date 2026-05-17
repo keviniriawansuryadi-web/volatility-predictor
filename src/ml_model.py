@@ -5,12 +5,28 @@ from sklearn.ensemble import RandomForestRegressor
 from src.features import FEATURE_COLS
 
 
-def _spike_weighted_obj(pred, dtrain):
-    """Custom XGBoost objective: 3x penalty when underestimating high-vol days (>0.5)."""
+def asymmetric_vol_loss(pred, dtrain):
+    """
+    Asymmetric XGBoost objective that penalises underestimation more than overestimation.
+
+    Gradient and Hessian follow the standard squared-error derivation, but the
+    coefficient is tripled (6 vs 2) when the model underestimates realised vol
+    (residual = pred − y_true < 0).  This is mathematically correct:
+
+        L(r) = k * r^2 / 2   where k = 6 if r < 0 else 2
+        dL/dr  = k * r         ← gradient returned
+        d²L/dr² = k            ← hessian returned
+
+    The old `_spike_weighted_obj` only applied the penalty for y_true > 0.5
+    (annualised vol > 50%), which almost never fires on normal tickers.
+    This version penalises *any* underestimation, which is the correct
+    asymmetry for a risk-aware volatility forecast.
+    """
     y_true = dtrain.get_label()
     residual = pred - y_true
-    weight = np.where((y_true > 0.5) & (residual < 0), 3.0, 1.0)
-    return weight * residual, weight * np.ones_like(residual)
+    grad = np.where(residual < 0, 6.0 * residual, 2.0 * residual)
+    hess = np.where(residual < 0, 6.0, 2.0)
+    return grad, hess
 
 
 class _BoosterWrapper:
@@ -36,8 +52,8 @@ def train_and_predict(
     Train a volatility model on the training split and return test-set predictions.
 
     Supported model_type values: 'xgboost', 'xgboost_asymmetric', 'random_forest'.
-    The asymmetric variant uses a custom XGBoost objective that applies a 3×
-    gradient penalty when the model underestimates spike days (vol > 50%).
+    The asymmetric variant uses a custom XGBoost objective (asymmetric_vol_loss)
+    that applies a 3× gradient penalty on any underestimation of realised vol.
 
     Returns (pred_series, fitted_model, feature_list).
     """
@@ -71,7 +87,7 @@ def train_and_predict(
             "verbosity": 0,
         }
         dtrain = xgb.DMatrix(X_train, label=y_train)
-        booster = xgb.train(params, dtrain, num_boost_round=300, obj=_spike_weighted_obj)
+        booster = xgb.train(params, dtrain, num_boost_round=300, obj=asymmetric_vol_loss)
         model = _BoosterWrapper(booster, X_train.shape[1])
 
     else:  # random_forest
