@@ -32,6 +32,15 @@ def train_and_predict(
     model_type: str = "xgboost",
     train_size: float = 0.8,
 ):
+    """
+    Train a volatility model on the training split and return test-set predictions.
+
+    Supported model_type values: 'xgboost', 'xgboost_asymmetric', 'random_forest'.
+    The asymmetric variant uses a custom XGBoost objective that applies a 3×
+    gradient penalty when the model underestimates spike days (vol > 50%).
+
+    Returns (pred_series, fitted_model, feature_list).
+    """
     available = [c for c in FEATURE_COLS if c in feat_df.columns]
     X = feat_df[available].values
     y = feat_df["target"].values
@@ -81,6 +90,7 @@ def train_and_predict(
 
 
 def predict_latest(model, latest_row: pd.DataFrame) -> float:
+    """Return a scalar vol forecast for the most recent trading day."""
     available = [c for c in FEATURE_COLS if c in latest_row.columns]
     X = latest_row[available].values
     if isinstance(model, _BoosterWrapper):

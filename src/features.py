@@ -28,6 +28,13 @@ FEATURE_COLS = [
 
 
 def _add_features(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Compute the full set of predictive features from a price DataFrame.
+
+    Expects columns: close, volume, log_return, realized_vol_21d.
+    Optionally enriches with vix_level/vix_change and sentiment if present.
+    Returns a copy of df with all FEATURE_COLS appended (NaNs for missing data).
+    """
     feat = df.copy()
 
     # Lagged returns
@@ -79,6 +86,13 @@ def _add_features(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_features(df: pd.DataFrame, forecast_horizon: int = 5) -> pd.DataFrame:
+    """
+    Build the supervised feature matrix used for model training.
+
+    Calls _add_features, then appends a 'target' column equal to the
+    annualised realized vol over the next `forecast_horizon` trading days.
+    Rows with any NaN (early lookback period) are dropped.
+    """
     feat = _add_features(df)
     feat["target"] = (
         feat["log_return"].shift(-forecast_horizon).rolling(forecast_horizon).std() * np.sqrt(252)

@@ -51,6 +51,15 @@ def compare_models(
     ticker: str = "TICKER",
     plot_dir: str = ".",
 ) -> pd.DataFrame:
+    """
+    Evaluate all forecasts against the held-out test set and print a metrics table.
+
+    Computes RMSE, MAE, QLIKE, Pearson correlation, and spike accuracy (% of
+    90th-pct vol days the model correctly flagged as high-vol).
+    Saves a 3-panel forecast chart to outputs/plots/ and a metrics CSV to
+    outputs/results/{ticker}/metrics.csv.
+    Returns the metrics DataFrame indexed by model name.
+    """
     split = int(len(feat_df) * train_size)
     test_df = feat_df.iloc[split:]
     y_true = test_df["target"].values

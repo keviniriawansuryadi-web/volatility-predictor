@@ -9,6 +9,14 @@ def rolling_garch_forecast(
     forecast_horizon: int = 5,
     model_type: str = "EGARCH",
 ) -> pd.Series:
+    """
+    Produce out-of-sample vol forecasts using an expanding-window GARCH fit.
+
+    For each step i in the test set the model is re-fitted on all returns
+    up to i, then a `forecast_horizon`-step-ahead variance forecast is taken.
+    Returns an annualised vol series indexed to the test dates.
+    EGARCH uses simulation-based multi-step forecasting (20 paths by default).
+    """
     n = len(log_returns)
     split = int(n * train_size)
     returns_scaled = log_returns * 100  # arch library works better with scaled returns

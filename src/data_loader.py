@@ -8,6 +8,13 @@ CACHE_DIR = Path(__file__).parent.parent / "data"
 
 
 def load_stock_data(ticker: str, start: str, end: str, cache: bool = True) -> pd.DataFrame:
+    """
+    Download OHLCV data for `ticker` from Yahoo Finance and return a cleaned DataFrame.
+
+    Columns returned: close, volume, log_return, realized_vol_21d.
+    Results are CSV-cached under data/ to avoid redundant downloads.
+    The cache is bypassed when end == today so the latest bar is always fresh.
+    """
     CACHE_DIR.mkdir(exist_ok=True)
     cache_path = CACHE_DIR / f"{ticker}_{start}_{end}.csv"
 
