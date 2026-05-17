@@ -5,5 +5,6 @@ data/
 outputs/
 *.png
 !docs/images/*.png
+!memes/*.png
 .env
 .claude/
