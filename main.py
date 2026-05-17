@@ -1,6 +1,8 @@
 import argparse
+import json
 import numpy as np
 from datetime import date, timedelta
+from pathlib import Path
 
 from src.data_loader import load_stock_data, load_vix_data
 from src.sentiment import fetch_sentiment, fetch_wsb_sentiment
@@ -218,7 +220,84 @@ def run_ticker(
         print(f"  EGARCH-ML disagree: {last_disagree:.3f}  [{flag_txt}]")
     print(f"{'='*60}\n")
 
+    # 10. Save live signal JSON
+    _save_live_signal(
+        ticker=ticker,
+        latest_date=latest_date,
+        current_price=float(current_price),
+        realized_vol=float(realized_vol),
+        horizon=horizon,
+        forecasts={
+            "xgboost":      float(xgb_now),
+            "xgb_asymmetric": float(xgb_asym_now),
+            "random_forest": float(rf_now),
+            garch_type.lower(): float(garch_now),
+            "ensemble":     float(ensemble),
+        },
+        regime=_regime(ensemble),
+        disagreement={
+            "value":    float(last_disagree) if not np.isnan(last_disagree) else None,
+            "cutoff":   float(disagree_result.get("disagreement_cutoff", float("nan")))
+                        if disagree_result.get("available") else None,
+            "flag":     disagree_flag,
+        },
+        sentiment_h1_significant=bool(hyp_result.get("significant", False)),
+        plot_dir=plot_dir,
+    )
+
     return {"ticker": ticker, "metrics_df": metrics_df, "hyp_result": hyp_result}
+
+
+def _save_live_signal(
+    ticker: str,
+    latest_date: str,
+    current_price: float,
+    realized_vol: float,
+    horizon: int,
+    forecasts: dict,
+    regime: str,
+    disagreement: dict,
+    sentiment_h1_significant: bool,
+    plot_dir: str = ".",
+) -> None:
+    """
+    Persist the live forward signal to a structured JSON file.
+
+    Writes `outputs/live_signal_{ticker}_{date}.json` containing all model
+    point forecasts, the ensemble regime call, EGARCH-ML disagreement flag,
+    and key hypothesis test results for downstream consumption (dashboards,
+    alerting systems, backtesting ingestion).
+
+    Parameters mirror the live signal block in run_ticker() — all values
+    must already be Python scalars (no numpy types) so json.dumps succeeds
+    without a custom encoder.
+    """
+    out_dir = Path(plot_dir) / "outputs"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    payload = {
+        "ticker":           ticker,
+        "signal_date":      latest_date,
+        "generated_utc":    date.today().isoformat(),
+        "price":            current_price,
+        "realized_vol_21d": realized_vol,
+        "forecast_horizon": horizon,
+        "forecasts":        forecasts,
+        "regime":           regime,
+        "disagreement":     disagreement,
+        "sentiment": {
+            "h1_significant": sentiment_h1_significant,
+            "note": (
+                "H1 significant: pre-spike sentiment is detectably negative."
+                if sentiment_h1_significant
+                else "H1 not significant at alpha=0.05."
+            ),
+        },
+    }
+
+    out = out_dir / f"live_signal_{ticker}_{latest_date}.json"
+    out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    print(f"Live signal saved: {out}")
 
 
 def main():
