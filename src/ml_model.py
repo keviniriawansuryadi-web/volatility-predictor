@@ -161,6 +161,105 @@ def train_quantile_models(
     return result
 
 
+def train_stacking_ensemble(
+    feat_df: pd.DataFrame,
+    base_forecasts: dict[str, pd.Series],
+    train_size: float = 0.8,
+    vix_series: pd.Series | None = None,
+) -> pd.Series:
+    """
+    Train a Ridge regression meta-learner that stacks base model forecasts.
+
+    The stacking protocol is:
+      - The test set is split in half: the first half is used to fit the
+        meta-learner (so it sees OOF-style predictions), and the second half
+        is the true evaluation window.
+      - Base model forecasts are used as features; if a 'vix_level' column
+        exists in feat_df, a normalised VIX regime indicator is added as an
+        extra meta-feature so the ensemble can learn to trust different models
+        in high-vol vs low-vol regimes.
+      - The meta-learner is constrained to non-negative weights so it behaves
+        like a proper weighted average (no short-selling of model outputs).
+
+    Skips gracefully and returns a constant-NaN series if fewer than 2 base
+    forecasts are available or if the Ridge fit fails.
+
+    Parameters
+    ----------
+    feat_df        : Full feature DataFrame (must contain a 'target' column).
+    base_forecasts : Dict of {label: pd.Series} test-set predictions from base models.
+    train_size     : Fraction used for the base-model training split (default 0.8).
+    vix_series     : Optional pd.Series of VIX levels indexed to feat_df.index;
+                     used as a regime feature in the meta-learner.
+
+    Returns a pd.Series of stacked ensemble predictions on the second half of the
+    test set, named 'stacking_ensemble'.
+    """
+    from sklearn.linear_model import Ridge
+
+    split = int(len(feat_df) * train_size)
+    test_df = feat_df.iloc[split:]
+    test_index = test_df.index
+    y_test = test_df["target"].values
+
+    # Align all base forecasts to the test index
+    aligned: dict[str, np.ndarray] = {}
+    for name, series in base_forecasts.items():
+        arr = series.reindex(test_index).values
+        if not np.all(np.isnan(arr)):
+            aligned[name] = arr
+
+    if len(aligned) < 2:
+        warnings.warn("[stacking] Fewer than 2 base forecasts available — skipping ensemble.")
+        return pd.Series(np.nan, index=test_index, name="stacking_ensemble")
+
+    X_meta = np.column_stack(list(aligned.values()))
+
+    # Add VIX regime feature: normalised to [0, 1] over the test window
+    if vix_series is not None:
+        vix_aligned = vix_series.reindex(test_index).values.astype(float)
+        vix_min, vix_max = np.nanmin(vix_aligned), np.nanmax(vix_aligned)
+        if vix_max > vix_min:
+            vix_norm = (vix_aligned - vix_min) / (vix_max - vix_min)
+        else:
+            vix_norm = np.zeros_like(vix_aligned)
+        # Fill residual NaN with 0.5 (neutral regime)
+        vix_norm = np.where(np.isnan(vix_norm), 0.5, vix_norm)
+        X_meta = np.column_stack([X_meta, vix_norm])
+
+    # Replace NaN in base forecasts with column medians before fitting
+    col_medians = np.nanmedian(X_meta, axis=0)
+    nan_mask = np.isnan(X_meta)
+    for j in range(X_meta.shape[1]):
+        X_meta[nan_mask[:, j], j] = col_medians[j]
+
+    # Meta-train on first half of test, evaluate on second half
+    half = len(test_index) // 2
+    if half < 5:
+        warnings.warn("[stacking] Test set too small for meta-train split — skipping ensemble.")
+        return pd.Series(np.nan, index=test_index, name="stacking_ensemble")
+
+    X_meta_train, X_meta_eval = X_meta[:half], X_meta[half:]
+    y_meta_train = y_test[:half]
+    eval_index   = test_index[half:]
+
+    try:
+        ridge = Ridge(alpha=1.0, positive=True)
+        ridge.fit(X_meta_train, y_meta_train)
+        preds_eval = ridge.predict(X_meta_eval)
+    except Exception as exc:
+        warnings.warn(f"[stacking] Ridge fit failed: {exc} — skipping ensemble.")
+        return pd.Series(np.nan, index=test_index, name="stacking_ensemble")
+
+    model_names = list(aligned.keys())
+    n_base = len(model_names)
+    coef_labels = model_names + (["vix_regime"] if vix_series is not None else [])
+    coef_str = ", ".join(f"{lbl}={c:.3f}" for lbl, c in zip(coef_labels, ridge.coef_))
+    print(f"  [stacking] Ridge meta-learner coefficients: {coef_str}")
+
+    return pd.Series(preds_eval, index=eval_index, name="stacking_ensemble")
+
+
 def predict_latest(model, latest_row: pd.DataFrame) -> float:
     """Return a scalar vol forecast for the most recent trading day."""
     available = [c for c in FEATURE_COLS if c in latest_row.columns]
