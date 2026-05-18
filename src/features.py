@@ -18,6 +18,8 @@ FEATURE_COLS = [
     "rsi_14", "bb_width",
     # VIX (populated when ^VIX data is available)
     "vix_level", "vix_change",
+    # VIX term structure (populated when load_vix_term_structure() is used)
+    "vix_term_slope", "vix_short_squeeze", "vix_rv_premium",
     # Sentiment (populated when news data is available)
     "sentiment_3d", "sentiment_lag1", "sentiment_lag2", "sentiment_lag3",
     # Reddit WSB sentiment (populated when scraper returns data)
@@ -88,6 +90,12 @@ def _add_features(df: pd.DataFrame) -> pd.DataFrame:
     if "wsb_sentiment" in feat.columns:
         feat["wsb_sentiment_3d"]   = feat["wsb_sentiment"].rolling(3).mean()
         feat["wsb_sentiment_lag1"] = feat["wsb_sentiment"].shift(1)
+
+    # VIX term structure features (populated when load_vix_term_structure() is used)
+    # vix_term_slope and vix_short_squeeze are passed through directly from the DF.
+    # vix_rv_premium = VIX - realized_vol_21d (variance risk premium)
+    if "vix_level" in feat.columns and "realized_vol_21d" in feat.columns:
+        feat["vix_rv_premium"] = feat["vix_level"] - feat["realized_vol_21d"]
 
     return feat
 
