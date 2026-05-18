@@ -102,7 +102,7 @@ def _fetch_with_fallback(ticker: str) -> pd.DataFrame:
     Logs a warning when falling back so silent failures are visible.
     """
     try:
-        from scrapers.scraper_news import fetch_news
+        from src.scraper_news import fetch_news
         news_df = fetch_news(ticker)
     except Exception as exc:
         warnings.warn(f"[sentiment] Scraper import/run failed: {exc}")
@@ -161,7 +161,7 @@ def fetch_wsb_sentiment(
     or returns no posts.
     """
     try:
-        from scrapers.scraper_news import scrape_wsb_sentiment
+        from src.scraper_news import scrape_wsb_sentiment
     except Exception as exc:
         warnings.warn(f"[wsb_sentiment] Scraper import failed: {exc}")
         return pd.Series(0.0, index=index, name="wsb_sentiment")
