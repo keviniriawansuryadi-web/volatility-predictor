@@ -12,6 +12,8 @@ correctly when uploaded to a notebook server.
 
 from __future__ import annotations
 
+import matplotlib
+matplotlib.use("Agg")
 import warnings
 import numpy as np
 import pandas as pd

@@ -10,6 +10,8 @@ All tests target Micron Technology (MU) by default but are ticker-agnostic.
 
 from __future__ import annotations
 
+import matplotlib
+matplotlib.use("Agg")
 import warnings
 import numpy as np
 import pandas as pd

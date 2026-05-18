@@ -12,6 +12,13 @@ TICKERS = [
     "AMZN",                   # Consumer / Tech
 ]
 
+# Sector ETFs for generalisation analysis (Section 4).
+# ^VIX is not tradeable but its own vol is interesting.
+TICKERS_ETF = ["QQQ", "XLF", "XLE", "XLK", "XLV", "GLD", "TLT", "^VIX"]
+
+# Out-of-sample tickers (Section 5) — never tuned, pure generalisation test.
+TICKERS_OOS = ["TSLA", "GS", "PFE"]
+
 SECTOR_MAP = {
     "MU":   "Semiconductors",
     "NVDA": "Semiconductors",
@@ -23,6 +30,17 @@ SECTOR_MAP = {
     "AAPL": "Tech",
     "MSFT": "Tech",
     "AMZN": "Consumer/Tech",
+}
+
+ETF_SECTOR_MAP = {
+    "QQQ":  "Tech-ETF",
+    "XLF":  "Financial-ETF",
+    "XLE":  "Energy-ETF",
+    "XLK":  "Tech-ETF",
+    "XLV":  "Healthcare-ETF",
+    "GLD":  "Commodity-ETF",
+    "TLT":  "Bond-ETF",
+    "^VIX": "VIX",
 }
 
 SECTOR_COLORS = {
