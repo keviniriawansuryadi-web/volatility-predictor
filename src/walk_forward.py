@@ -9,6 +9,11 @@ Reports mean ± std QLIKE across folds.
 from __future__ import annotations
 
 import warnings
+from pathlib import Path
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import numpy as np
 import pandas as pd
 from typing import Callable
@@ -114,3 +119,127 @@ def walk_forward_validate(
         print(f"  {model:<22} {mu:>12.4f} {std:>12.4f} {stable:>12}")
 
     return detail_df
+
+
+def plot_walk_forward_results(
+    wf_results: pd.DataFrame,
+    ticker: str,
+    save_path: str | None = None,
+    feat_df: pd.DataFrame | None = None,
+) -> str:
+    """
+    Visualizes walk-forward CV results.  Supports two input formats:
+
+    Per-fold format (preferred): columns [model, fold, QLIKE, ticker?]
+      → Draws a line chart of QLIKE per fold, with regime shading.
+
+    Summary format (fallback): columns [model, mean, std, ticker?]
+      → Draws a bar chart of mean QLIKE with ±std error bars.
+        Shading is replaced by a stability annotation (std/mean ratio).
+
+    The shaded background (per-fold mode) encodes regime: green = calm
+    (median test-set RV < 25%), red = stressed (median RV ≥ 25%).
+
+    Parameters
+    ----------
+    wf_results : DataFrame from walk_forward_validate() OR the summary CSV.
+    ticker     : Ticker symbol for title.
+    save_path  : Full path to save PNG.  Defaults to
+                 outputs/plots/{ticker}_walk_forward.png.
+    feat_df    : Feature DataFrame for regime shading (per-fold mode only).
+
+    Returns the path of the saved PNG.
+    """
+    if wf_results.empty:
+        return ""
+
+    colors = {
+        "EGARCH":          "#e74c3c",
+        "HAR-RV":          "#e67e22",
+        "XGBoost":         "#3498db",
+        "XGB-Asymmetric":  "#2980b9",
+        "RandomForest":    "#27ae60",
+        "StackingEnsemble":"#8e44ad",
+        "Persistence":     "#95a5a6",
+    }
+
+    out_dir = Path(__file__).parent.parent / "outputs" / "plots"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    if save_path is None:
+        save_path = str(out_dir / f"{ticker}_walk_forward.png")
+
+    # ── Per-fold format ───────────────────────────────────────────────────────
+    if "fold" in wf_results.columns and "QLIKE" in wf_results.columns:
+        models  = wf_results["model"].unique().tolist()
+        n_folds = int(wf_results["fold"].max())
+        folds   = list(range(1, n_folds + 1))
+
+        fold_stressed = {}
+        if feat_df is not None:
+            n = len(feat_df)
+            step = 0.5 / n_folds
+            for k in range(n_folds):
+                ts = int(n * (0.50 + k * step))
+                te = int(n * (0.50 + (k + 1) * step)) if k < n_folds - 1 else n
+                median_rv = float(feat_df["target"].iloc[ts:te].median()) if te > ts else 0
+                fold_stressed[k + 1] = median_rv >= 0.25
+
+        fig, ax = plt.subplots(figsize=(12, 6))
+        for fold_num in folds:
+            color = "#fadbd8" if fold_stressed.get(fold_num, False) else "#d5f5e3"
+            ax.axvspan(fold_num - 0.5, fold_num + 0.5, alpha=0.35, color=color, linewidth=0)
+
+        for model in models:
+            grp = wf_results[wf_results["model"] == model].sort_values("fold")
+            ql = [float(grp.loc[grp["fold"] == f, "QLIKE"].values[0])
+                  if len(grp.loc[grp["fold"] == f]) > 0 else float("nan")
+                  for f in folds]
+            ax.plot(folds, ql, marker="o", linewidth=2, markersize=6,
+                    color=colors.get(model, "#7f8c8d"), label=model)
+
+        ax.set_xticks(folds)
+        ax.set_xticklabels([f"Fold {f}" for f in folds])
+        ax.set_xlabel("Walk-Forward Fold")
+
+        calm_patch    = mpatches.Patch(facecolor="#d5f5e3", alpha=0.7, label="Calm (RV < 25%)")
+        stressed_patch = mpatches.Patch(facecolor="#fadbd8", alpha=0.7, label="Stressed (RV ≥ 25%)")
+        handles, labels = ax.get_legend_handles_labels()
+        ax.legend(handles=handles + [calm_patch, stressed_patch],
+                  labels=labels + ["Calm (RV < 25%)", "Stressed (RV ≥ 25%)"],
+                  loc="upper right", fontsize=8)
+
+    # ── Summary format (mean/std) ─────────────────────────────────────────────
+    elif "mean" in wf_results.columns:
+        df_t   = wf_results.sort_values("mean")
+        models = df_t["model"].tolist()
+        means  = df_t["mean"].values
+        stds   = df_t["std"].fillna(0).values
+        bar_colors = [colors.get(m, "#7f8c8d") for m in models]
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+        x = range(len(models))
+        bars = ax.bar(x, means, color=bar_colors, alpha=0.75, width=0.6)
+        ax.errorbar(x, means, yerr=stds, fmt="none", color="black",
+                    capsize=4, linewidth=1.5)
+
+        for i, (m, mu, sd) in enumerate(zip(models, means, stds)):
+            cv = sd / (mu + 1e-10)
+            label = f"cv={cv:.2f}" if sd > 0 else "single"
+            ax.text(i, mu + sd + 0.005, label, ha="center", va="bottom",
+                    fontsize=7, color="gray")
+
+        ax.set_xticks(list(x))
+        ax.set_xticklabels(models, rotation=20, ha="right")
+        ax.set_xlabel("Model")
+
+    else:
+        print(f"  [walk_forward] Unrecognised format: {wf_results.columns.tolist()}")
+        return ""
+
+    ax.set_ylabel("QLIKE (lower is better)")
+    ax.set_title(f"Walk-Forward CV — Mean QLIKE ± Std — {ticker}")
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=120, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  Walk-forward chart saved: {save_path}")
+    return save_path
