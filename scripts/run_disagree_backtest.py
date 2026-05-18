@@ -3,6 +3,8 @@ Run EGARCH-ML disagreement signal backtest for MU and JPM.
 Uses cached price data — does NOT re-download or retrain full pipeline.
 """
 import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.stdout.reconfigure(encoding="utf-8")
 import warnings
 warnings.filterwarnings("ignore")

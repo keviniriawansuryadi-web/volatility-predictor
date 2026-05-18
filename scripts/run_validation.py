@@ -1,5 +1,7 @@
 """Run validate_model_performance() for NVDA, BAC, AAPL (suspiciously strong results)."""
 import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.stdout.reconfigure(encoding="utf-8")
 import warnings
 warnings.filterwarnings("ignore")
