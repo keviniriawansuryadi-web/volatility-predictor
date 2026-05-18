@@ -13,6 +13,7 @@ from __future__ import annotations
 import matplotlib
 matplotlib.use("Agg")
 import warnings
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
@@ -744,6 +745,154 @@ def test_sentiment_mean_reversion(
         mean_sentiment_t3=mean_t3,
         conclusion=conclusion,
         figure=fig,
+    )
+
+
+# ============================================================================ #
+# H9 -- VARIANCE RISK PREMIUM ANALYSIS
+# ============================================================================ #
+
+def analyze_variance_risk_premium(
+    df: pd.DataFrame,
+    ticker: str = "SPY",
+    forward_days: int = 10,
+    plot_dir: str = ".",
+) -> dict:
+    """
+    The variance risk premium (VRP) is the difference between implied
+    volatility (VIX) and realized volatility.  It represents compensation
+    for bearing vol risk.  Historically:
+      - Positive VRP (VIX > RV) is the normal state
+      - Negative VRP (RV > VIX) signals that realized vol has surprised
+        the market upward — often a leading indicator of continued stress
+        or mean reversion
+
+    This function plots VRP over time, marks negative VRP episodes, and
+    tests H9: whether negative VRP predicts above-average vol in the next
+    10 days (Mann-Whitney U test on next-10d realized vol split by VRP sign).
+
+    Parameters
+    ----------
+    df         : DataFrame with 'vix_level' and 'realized_vol_21d' columns.
+    ticker     : Ticker symbol for labelling.  VIX is SPY-specific.
+    forward_days: Days ahead to test for elevated vol (default 10).
+    plot_dir   : Root output directory for saving plots.
+
+    Returns dict with vrp series, test statistic, p-value, conclusion,
+    and current VRP state.
+    """
+    if "vix_level" not in df.columns or "realized_vol_21d" not in df.columns:
+        return {"available": False, "conclusion": "Need vix_level and realized_vol_21d columns."}
+
+    vrp = (df["vix_level"] - df["realized_vol_21d"]).dropna()
+    vrp.name = "vrp"
+
+    # Current VRP state
+    current_vix = float(df["vix_level"].iloc[-1])
+    current_rv  = float(df["realized_vol_21d"].iloc[-1])
+    current_vrp = current_vix - current_rv
+
+    vrp_sign = "NEGATIVE (RV > VIX)" if current_vrp < 0 else f"POSITIVE ({current_vix:.1%} - {current_rv:.1%})"
+
+    print(f"\n{'='*60}")
+    print(f"  VARIANCE RISK PREMIUM — {ticker}")
+    print(f"{'='*60}")
+    print(f"  Current VIX: {current_vix:.1%}")
+    print(f"  Current RV (21d): {current_rv:.1%}")
+    print(f"  Current VRP: {current_vrp:+.1%}  [{vrp_sign}]")
+
+    # ── H9: Negative VRP predicts continued elevated vol ─────────────────────
+    # Build forward 10-day vol series
+    fwd_col = f"fwd_{forward_days}d_vol"
+    df2 = df.copy()
+    df2[fwd_col] = (
+        df2["log_return"].shift(-forward_days).rolling(forward_days).std() * np.sqrt(252)
+    )
+    df2["vrp"] = df2["vix_level"] - df2["realized_vol_21d"]
+    df2 = df2.dropna(subset=["vrp", fwd_col])
+
+    neg_vrp_mask = df2["vrp"] < 0
+    pos_vrp_mask = df2["vrp"] >= 0
+
+    neg_fwd = df2.loc[neg_vrp_mask, fwd_col].values
+    pos_fwd = df2.loc[pos_vrp_mask, fwd_col].values
+
+    n_neg = len(neg_fwd)
+    n_pos = len(pos_fwd)
+
+    print(f"\n  H9 Test: Does negative VRP predict elevated vol in next {forward_days}d?")
+    print(f"  Negative VRP episodes: {n_neg} days")
+    print(f"  Positive VRP episodes: {n_pos} days")
+
+    if n_neg < 5 or n_pos < 5:
+        conclusion = f"Insufficient data for H9 (neg={n_neg}, pos={n_pos})."
+        return {"available": False, "conclusion": conclusion, "current_vrp": current_vrp}
+
+    u_stat, p_val = stats.mannwhitneyu(neg_fwd, pos_fwd, alternative="greater")
+    r = 1 - 2 * u_stat / (n_neg * n_pos)
+
+    neg_mean = float(neg_fwd.mean())
+    pos_mean = float(pos_fwd.mean())
+
+    conclusion = (
+        f"H9 {'SUPPORTED' if p_val < 0.05 else 'NOT SUPPORTED'}: "
+        f"Negative VRP days show {'significantly' if p_val < 0.05 else 'not significantly'} "
+        f"higher forward vol ({neg_mean:.1%} vs {pos_mean:.1%}, "
+        f"U={u_stat:.0f}, p={p_val:.4f}, r={r:.3f})."
+    )
+    _print_result("H9", "VRP Sign → Future Vol (Mann-Whitney U)", u_stat, p_val, r, conclusion)
+
+    # ── Matplotlib chart ──────────────────────────────────────────────────────
+    out_dir = Path(plot_dir) / "outputs" / "plots"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    fig, axes = plt.subplots(2, 1, figsize=(14, 8), sharex=True)
+
+    # Panel 1: VRP over time with negative episodes shaded
+    ax1 = axes[0]
+    ax1.plot(vrp.index, vrp.values, linewidth=1, color="#3498db", label="VRP")
+    ax1.axhline(0, color="black", linewidth=0.8, linestyle="--")
+    neg_dates = vrp[vrp < 0]
+    ax1.fill_between(vrp.index, vrp.values, 0, where=(vrp < 0),
+                     alpha=0.4, color="#e74c3c", label="Negative VRP (RV > VIX)")
+    ax1.set_ylabel("VRP (VIX - RV21d)")
+    ax1.set_title(f"Variance Risk Premium — {ticker}")
+    ax1.legend(loc="upper right")
+
+    # Panel 2: Forward 10d vol split by VRP sign
+    ax2 = axes[1]
+    ax2.scatter(df2.loc[neg_vrp_mask].index, neg_fwd, alpha=0.4, s=10,
+                color="#e74c3c", label=f"After neg VRP (mean={neg_mean:.1%})")
+    ax2.scatter(df2.loc[pos_vrp_mask].index, pos_fwd, alpha=0.2, s=10,
+                color="#3498db", label=f"After pos VRP (mean={pos_mean:.1%})")
+    ax2.set_ylabel(f"Next-{forward_days}d Realized Vol")
+    ax2.set_title(f"H9: Forward Vol by VRP Sign (p={p_val:.4f})")
+    ax2.legend(loc="upper right")
+
+    plt.tight_layout()
+    chart_path = out_dir / f"{ticker}_vrp_analysis.png"
+    plt.savefig(chart_path, dpi=120, bbox_inches="tight")
+    plt.close(fig)
+    print(f"  VRP chart saved: {chart_path}")
+
+    return dict(
+        available=True,
+        ticker=ticker,
+        hypothesis="H9",
+        vrp_series=vrp,
+        current_vrp=round(current_vrp, 6),
+        current_vix=round(current_vix, 6),
+        current_rv=round(current_rv, 6),
+        current_state=vrp_sign,
+        n_negative_vrp=n_neg,
+        n_positive_vrp=n_pos,
+        neg_mean_fwd_vol=round(neg_mean, 6),
+        pos_mean_fwd_vol=round(pos_mean, 6),
+        statistic=u_stat,
+        p_value=p_val,
+        effect_size=r,
+        significant=(p_val < 0.05),
+        conclusion=conclusion,
     )
 
 
