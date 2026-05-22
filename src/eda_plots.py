@@ -392,6 +392,7 @@ def plot_10k_event_study(
     offsets = np.arange(-window, window + 1)
 
     def _build_matrix(dates):
+        """Stack per-date feature rows into a 2-D matrix for the event study."""
         rows = []
         for fd in dates:
             pos = df.index.searchsorted(fd)
@@ -404,6 +405,7 @@ def plot_10k_event_study(
         return np.array(rows, dtype=float)
 
     def _boot_ci(mat, alpha=0.05):
+        """Return per-column means and a bootstrap (1-alpha) confidence band."""
         means = np.nanmean(mat, axis=0)
         boot = np.array([
             np.nanmean(mat[rng.integers(0, len(mat), len(mat))], axis=0)
@@ -476,6 +478,7 @@ def plot_weekday_volatility(
     overall_med = data["realized_vol_21d"].median()
 
     def _boot_med(vals, n=1000, seed=42):
+        """Return the median of vals with a bootstrap 95% CI (n resamples)."""
         rng = np.random.default_rng(seed)
         boot = np.array([
             np.median(rng.choice(vals, len(vals), replace=True))
@@ -566,6 +569,7 @@ def plot_feature_target_correlation(
     }
 
     def _cat(col):
+        """Return the feature-category label for a given feature column name."""
         if col in feature_cats["technical"]:
             return "Technical"
         if col in feature_cats["sentiment"]:

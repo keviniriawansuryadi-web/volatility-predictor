@@ -49,6 +49,7 @@ REGIME_ELEVATED = 0.15
 
 
 def _regime_label(vol: float) -> str:
+    """Map an annualized vol level to a regime label using the REGIME_* cutoffs."""
     if vol >= REGIME_EXTREME:
         return "Extreme"
     if vol >= REGIME_HIGH:

@@ -177,6 +177,15 @@ def print_disagreement_results(result: dict) -> None:
 
 
 def print_hypothesis_results(result: dict) -> None:
+    """Print a formatted summary of the spike-sentiment hypothesis test.
+
+    Args:
+        result (dict): output of spike_sentiment_test(); if it lacks an
+            'available' key set True, an INCONCLUSIVE message is printed.
+
+    Returns:
+        None.
+    """
     print("\n" + "=" * 60)
     print("  HYPOTHESIS TEST: Sentiment Before Volatility Spikes")
     print("=" * 60)

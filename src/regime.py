@@ -20,6 +20,7 @@ REGIME_ORDER = ["Low", "Elevated", "High", "Extreme"]
 
 
 def _label(vol: float) -> str:
+    """Map an annualized vol level to a regime label using REGIME_BOUNDS."""
     if vol >= REGIME_BOUNDS["High"]:
         return "Extreme"
     if vol >= REGIME_BOUNDS["Elevated"]:

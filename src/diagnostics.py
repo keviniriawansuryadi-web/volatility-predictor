@@ -25,6 +25,7 @@ DIAG_DIR = Path(__file__).parent.parent / "outputs" / "diagnostics"
 
 
 def _regime_label(vol: float) -> str:
+    """Map an annualized vol level to a regime label (Low/Elevated/High/Extreme)."""
     if vol >= 0.35:
         return "Extreme"
     if vol >= 0.25:
@@ -95,9 +96,11 @@ def diagnose_poor_performer(
     lines: list[str] = []
 
     def h(text: str, level: int = 2) -> None:
+        """Append a Markdown heading of the given level to the report buffer."""
         lines.append(f"\n{'#' * level} {text}\n")
 
     def p(text: str) -> None:
+        """Append a Markdown paragraph line to the report buffer."""
         lines.append(text + "\n")
 
     # ── Header ──────────────────────────────────────────────────────────────────
@@ -119,6 +122,7 @@ def diagnose_poor_performer(
     lines.append(sep)
     for _, row in tbl.iterrows():
         def _fmt(v):
+            """Format a cell value: floats to 4 decimals, everything else as str."""
             if isinstance(v, float):
                 return f"{v:.4f}"
             return str(v)
@@ -387,6 +391,8 @@ def decompose_spike_accuracy(
 
         # Decompose: on correctly flagged spike days, how many had each driver elevated?
         def _pct_elevated(feature_vals, threshold):
+            """Return the fraction of feature values at/above threshold, or None
+            if either input is missing."""
             if feature_vals is None or threshold is None:
                 return None
             return float((feature_vals[hit_mask] > threshold).mean()) if n_hits > 0 else 0.0

@@ -127,6 +127,15 @@ def compute_portfolio_vol_forecast(
 
 
 def _print_portfolio_summary(result: dict, spy_forecast: float | None) -> None:
+    """Print a formatted portfolio volatility summary.
+
+    Args:
+        result (dict): portfolio vol result (weights, portfolio vol, etc.).
+        spy_forecast (float | None): SPY vol forecast for comparison, or None.
+
+    Returns:
+        None.
+    """
     print(f"\n{'='*65}")
     print("  PORTFOLIO VOL FORECAST")
     print(f"{'='*65}")

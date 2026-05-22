@@ -52,6 +52,17 @@ _TIMEOUT = 15
 # ─── internal helpers ──────────────────────────────────────────────────────────
 
 def _to_df(records: list[dict], source: str, ticker: str) -> pd.DataFrame:
+    """Normalise raw {headline, datetime} records into the standard news schema.
+
+    Args:
+        records (list[dict]): scraped items with 'headline' and 'datetime' keys.
+        source (str): source label to tag every row with.
+        ticker (str): ticker symbol (upper-cased into the 'ticker' column).
+
+    Returns:
+        pd.DataFrame: columns [headline, source, datetime, ticker], tz-naive,
+        with null-headline rows dropped. Empty frame if no records.
+    """
     if not records:
         return pd.DataFrame(columns=["headline", "source", "datetime", "ticker"])
     df = pd.DataFrame(records)
@@ -63,6 +74,7 @@ def _to_df(records: list[dict], source: str, ticker: str) -> pd.DataFrame:
 
 
 def _norm_key(text: str) -> str:
+    """Return a lowercased, punctuation-stripped key for headline dedup."""
     return re.sub(r"[^a-z0-9 ]", "", text.lower()).strip()
 
 

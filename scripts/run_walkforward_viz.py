@@ -54,6 +54,7 @@ print(f"  Tickers available: {wf_df['ticker'].unique().tolist()}")
 
 
 def _load_feat(ticker):
+    """Load prices/VIX/sentiment and return the engineered feature DataFrame."""
     df = load_stock_data(ticker, START, TODAY, cache=True)
     vix = load_vix_data(START, TODAY)
     if not vix.empty:

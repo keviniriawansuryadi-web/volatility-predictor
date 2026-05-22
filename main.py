@@ -35,7 +35,14 @@ from src.disagree_backtest import (
 from config import TICKERS, DEFAULT_HORIZON, DEFAULT_TRAIN_SIZE, DEFAULT_GARCH_TYPE
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments for the pipeline.
+
+    Returns:
+        argparse.Namespace: parsed args (ticker, all_tickers, start, end,
+        horizon, train_size, garch_type, no_cache, plot_dir). Dates default
+        to a 5-year window ending today.
+    """
     today = date.today().isoformat()
     five_years_ago = (date.today() - timedelta(days=5 * 365)).isoformat()
 
@@ -228,6 +235,7 @@ def run_ticker(
         live_disagree_pct = None
 
     def _regime(v: float) -> str:
+        """Map an annualized vol level to a regime label with a scalping note."""
         if v > 0.35:
             return "EXTREME  -- Very high risk/reward, tight stops essential"
         if v > 0.25:
@@ -355,7 +363,8 @@ def _enrich_signal_regime(payload: dict, regime_result: dict) -> dict:
     return enrich_live_signal_with_regime(payload, regime_result)
 
 
-def main():
+def main() -> None:
+    """CLI entry point: run the pipeline for one ticker or the full config set."""
     args = parse_args()
     use_cache = not args.no_cache
 

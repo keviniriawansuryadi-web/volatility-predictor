@@ -26,6 +26,7 @@ REGIME_ORDER = ["Low", "Elevated", "High", "Extreme"]
 
 
 def _label_regime(vol: float) -> str:
+    """Map an annualized vol level to a regime label using REGIME_BOUNDS."""
     if vol >= REGIME_BOUNDS["High"]:
         return "Extreme"
     if vol >= REGIME_BOUNDS["Elevated"]:
@@ -36,6 +37,7 @@ def _label_regime(vol: float) -> str:
 
 
 def _qlike(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """Return the QLIKE loss (lower is better) between realized and predicted vol."""
     h = np.maximum(y_pred, 1e-8) ** 2
     s2 = y_true ** 2
     return float(np.mean(s2 / h - np.log(s2 / h) - 1))

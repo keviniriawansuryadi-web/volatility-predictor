@@ -250,7 +250,10 @@ for t, r in arch_results.items():
     p10 = pl.get(10, {}).get("p_value")
     p20 = pl.get(20, {}).get("p_value")
     strong = "YES" if r.get("all_strong_arch") else ("marginal" if r.get("any_significant") else "NO")
-    def fmt(v): return f"{v:.4f}" if v is not None else "n/a"
+
+    def fmt(v):
+        """Format a float to 4 decimals, or 'n/a' when the value is None."""
+        return f"{v:.4f}" if v is not None else "n/a"
     report_lines.append(f"| {t} | {fmt(p5)} | {fmt(p10)} | {fmt(p20)} | {strong} |\n")
 
 report_lines += [

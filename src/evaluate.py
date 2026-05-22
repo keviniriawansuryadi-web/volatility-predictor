@@ -27,6 +27,17 @@ def _spike_accuracy(y_true: np.ndarray, y_pred: np.ndarray, threshold: float) ->
 
 
 def _metrics(y_true: np.ndarray, y_pred: np.ndarray, name: str, spike_thresh: float) -> dict:
+    """Compute RMSE/MAE/QLIKE/Corr and spike accuracy for one model's forecasts.
+
+    Args:
+        y_true (np.ndarray): realized volatility.
+        y_pred (np.ndarray): model predictions (NaNs are masked out pairwise).
+        name (str): model label stored in the result dict.
+        spike_thresh (float): vol threshold defining a spike day.
+
+    Returns:
+        dict: metric name -> value for the given model.
+    """
     mask = ~(np.isnan(y_true) | np.isnan(y_pred))
     yt, yp = y_true[mask], y_pred[mask]
     if len(yt) == 0:
@@ -80,6 +91,7 @@ def compare_models(
     spike_thresh = np.nanpercentile(y_true, 90)
 
     def _align(series: pd.Series) -> np.ndarray:
+        """Reindex a forecast series onto the test-set index, returning an array."""
         return series.reindex(test_df.index).values
 
     results = []
@@ -345,6 +357,18 @@ def plot_shap_worst_prediction(
 
 
 def plot_shap(model, X_test: np.ndarray, feature_names: list, ticker: str, plot_dir: str) -> None:
+    """Save a SHAP feature-importance bar chart for a fitted tree model.
+
+    Args:
+        model: fitted XGBoost/RandomForest model or a booster wrapper.
+        X_test (np.ndarray): test-set feature matrix to explain.
+        feature_names (list): feature column names.
+        ticker (str): ticker symbol (used in the output filename/title).
+        plot_dir (str): directory to write the PNG into.
+
+    Returns:
+        None. Silently no-ops if the ``shap`` package is unavailable.
+    """
     try:
         import shap
 

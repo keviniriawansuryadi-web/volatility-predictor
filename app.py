@@ -33,12 +33,19 @@ st.set_page_config(
 
 
 def _qlike(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """Return the QLIKE loss between realized and predicted volatility.
+
+    QLIKE = mean(s2/h - log(s2/h) - 1), where h is the predicted variance
+    and s2 the realized variance; lower is better and it penalises
+    under-prediction of vol more heavily than over-prediction.
+    """
     h = np.maximum(y_pred, 1e-8) ** 2
     s2 = y_true ** 2
     return float(np.nanmean(s2 / h - np.log(s2 / h) - 1))
 
 
-def _regime(v: float):
+def _regime(v: float) -> tuple[str, str]:
+    """Map an annualized vol level to a (regime label, hex colour) pair."""
     if v > 0.35:
         return "EXTREME", "#c0392b"
     if v > 0.25:
@@ -50,7 +57,17 @@ def _regime(v: float):
     return "LOW", "#7f8c8d"
 
 
-def build_metrics(y_true, aligned_preds, spike_thresh):
+def build_metrics(y_true: np.ndarray, aligned_preds: dict, spike_thresh: float) -> pd.DataFrame:
+    """Build a per-model metrics table (RMSE, MAE, QLIKE, Corr, spike accuracy).
+
+    Args:
+        y_true (np.ndarray): realized volatility on the test set.
+        aligned_preds (dict): {model_name: np.ndarray of predictions} aligned to y_true.
+        spike_thresh (float): vol threshold defining a "spike" day.
+
+    Returns:
+        pd.DataFrame: one row per model, indexed by model name.
+    """
     rows = []
     for name, yp in aligned_preds.items():
         mask = ~(np.isnan(y_true) | np.isnan(yp))
@@ -71,6 +88,19 @@ def build_metrics(y_true, aligned_preds, spike_thresh):
 
 
 def make_forecast_fig(index, y_true, aligned_preds, spike_thresh, ticker):
+    """Build the 3-panel test-set figure: forecast vs realized, absolute
+    error over time, and a predicted-vs-realized scatter (spikes starred).
+
+    Args:
+        index: x-axis index (test-set dates).
+        y_true (np.ndarray): realized volatility on the test set.
+        aligned_preds (dict): {model_name: predictions} aligned to y_true.
+        spike_thresh (float): vol threshold defining a "spike" day.
+        ticker (str): ticker symbol for titles.
+
+    Returns:
+        matplotlib.figure.Figure: the assembled dark-themed figure.
+    """
     colors = ["steelblue", "darkorange", "forestgreen", "crimson", "mediumpurple"]
     spike = y_true > spike_thresh
     fig, axes = plt.subplots(3, 1, figsize=(12, 11), facecolor="#0e1117")
@@ -121,6 +151,18 @@ def make_forecast_fig(index, y_true, aligned_preds, spike_thresh, ticker):
 
 
 def make_shap_fig(model, X_test, feature_names, ticker):
+    """Build a horizontal bar chart of mean |SHAP value| per feature.
+
+    Args:
+        model: a fitted tree model (XGBoost/RandomForest) or its booster.
+        X_test (np.ndarray): test-set feature matrix to explain.
+        feature_names (list): feature column names.
+        ticker (str): ticker symbol for the title.
+
+    Returns:
+        matplotlib.figure.Figure | None: the figure, or None if SHAP is
+        unavailable or explanation fails.
+    """
     try:
         import shap
         underlying = model.get_booster() if hasattr(model, "get_booster") else \

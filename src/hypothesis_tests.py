@@ -551,6 +551,7 @@ def test_10k_risk_language(
     low_filings = lm_risk_scores[lm_risk_scores <= tercile_33].index
 
     def _post_vol(filing_group):
+        """Collect realized vols in the window following each filing in the group."""
         vols = []
         for fd in filing_group:
             pos = df.index.searchsorted(fd)
@@ -897,6 +898,19 @@ def analyze_variance_risk_premium(
 # ============================================================================ #
 
 def _print_result(hyp_id, test_name, stat, p_val, effect, conclusion):
+    """Print a formatted one-block summary of a hypothesis-test result.
+
+    Args:
+        hyp_id (str): hypothesis identifier (e.g. "H9").
+        test_name (str): name of the statistical test used.
+        stat (float): the test statistic.
+        p_val (float): p-value (compared against 0.05 for the verdict).
+        effect (float): effect-size measure.
+        conclusion (str): human-readable conclusion line.
+
+    Returns:
+        None.
+    """
     sig = "** significant **" if p_val < 0.05 else "not significant"
     print(f"\n{'-'*55}")
     print(f"  {hyp_id}: {test_name}")

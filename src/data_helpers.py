@@ -94,6 +94,8 @@ def simulate_sentiment(df: pd.DataFrame, ticker: str, seed: int = 42) -> pd.Data
     factor = (ret - ret.mean()) / (ret.std() + 1e-9)
 
     def _score(loading, noise_scale, ar=0.0):
+        """Generate one synthetic sentiment series from the shared factor plus
+        Gaussian noise, optionally with AR(1) persistence (ar > 0)."""
         base = loading * factor + rng.normal(0, noise_scale, n)
         if ar > 0:
             for i in range(1, n):

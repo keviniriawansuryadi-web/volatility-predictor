@@ -101,6 +101,7 @@ for t in TICKERS:
 
 
 def _regime_label(v: float) -> str:
+    """Map an annualized vol level to a regime label (NaN-safe)."""
     if np.isnan(v):
         return "Low"
     if v >= 0.35:

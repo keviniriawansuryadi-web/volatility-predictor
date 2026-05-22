@@ -29,6 +29,11 @@ TICKERS = ["MU", "NVDA", "AMD", "JPM", "BAC", "XOM", "AAPL", "MSFT"]
 
 
 def _build(ticker):
+    """Load prices, VIX, sentiment and features for a ticker.
+
+    Returns:
+        tuple: (raw price DataFrame with extra columns, engineered feature DataFrame).
+    """
     df = load_stock_data(ticker, START, TODAY, cache=True)
     vix_df = load_vix_data(START, TODAY)
     if not vix_df.empty:
@@ -45,28 +50,34 @@ def make_model_fns(ticker):
     """Return dict of model_fn(feat_df, df_raw, train_idx, test_idx) -> pd.Series."""
 
     def egarch_fn(feat_df, df_raw, train_idx, test_idx):
+        """EGARCH rolling forecast for the current fold."""
         train_size = test_idx.start / len(feat_df)
         return rolling_garch_forecast(df_raw["log_return"], train_size, HORIZON, DEFAULT_GARCH_TYPE)
 
     def har_fn(feat_df, df_raw, train_idx, test_idx):
+        """HAR-RV forecast for the current fold."""
         train_size = test_idx.start / len(feat_df)
         return har_rv_forecast(df_raw["realized_vol_21d"], train_size=train_size, forecast_horizon=HORIZON)
 
     def xgb_fn(feat_df, df_raw, train_idx, test_idx):
+        """XGBoost forecast for the current fold."""
         train_size = test_idx.start / len(feat_df)
         preds, _, _ = train_and_predict(feat_df, model_type="xgboost", train_size=train_size)
         return preds
 
     def rf_fn(feat_df, df_raw, train_idx, test_idx):
+        """Random Forest forecast for the current fold."""
         train_size = test_idx.start / len(feat_df)
         preds, _, _ = train_and_predict(feat_df, model_type="random_forest", train_size=train_size)
         return preds
 
     def persist_fn(feat_df, df_raw, train_idx, test_idx):
+        """Persistence baseline: yesterday's realized vol shifted onto the test index."""
         rv = feat_df["realized_vol_21d"] if "realized_vol_21d" in feat_df.columns else feat_df["target"]
         return rv.shift(1).iloc[test_idx]
 
     def stack_fn(feat_df, df_raw, train_idx, test_idx):
+        """Ridge stacking ensemble over EGARCH/XGBoost/XGB-Asym/RF for the fold."""
         train_size = test_idx.start / len(feat_df)
         eg = rolling_garch_forecast(df_raw["log_return"], train_size, HORIZON, DEFAULT_GARCH_TYPE)
         xg, _, _ = train_and_predict(feat_df, model_type="xgboost", train_size=train_size)

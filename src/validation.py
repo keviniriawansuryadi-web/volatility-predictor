@@ -19,6 +19,7 @@ REGIME_BOUNDS = {"Low": 0.15, "Elevated": 0.25, "High": 0.35}
 
 
 def _regime_label(v: float) -> str:
+    """Map an annualized vol level to a regime label (Low/Elevated/High/Extreme)."""
     if v >= 0.35:
         return "Extreme"
     if v >= 0.25:
@@ -179,6 +180,7 @@ def validate_model_performance(
 
 
 def _print_validation(r: dict) -> None:
+    """Print a formatted validation summary for one ticker's result dict."""
     print(f"\n{'='*60}")
     print(f"  VALIDATION — {r['ticker']}")
     print(f"{'='*60}")
@@ -216,6 +218,7 @@ def _print_validation(r: dict) -> None:
 
 
 def _save_validation_report(r: dict) -> None:
+    """Write a validation result dict to a JSON report under VAL_DIR."""
     VAL_DIR.mkdir(parents=True, exist_ok=True)
     ticker = r["ticker"]
 

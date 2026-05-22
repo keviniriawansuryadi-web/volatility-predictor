@@ -48,6 +48,13 @@ class _BoosterWrapper:
     """Wraps xgb.Booster to provide sklearn-compatible predict() and feature_importances_."""
 
     def __init__(self, booster: xgb.Booster, n_features: int):
+        """Store the booster and precompute normalised gain-based importances.
+
+        Args:
+            booster (xgb.Booster): a trained low-level XGBoost booster.
+            n_features (int): number of input features (to size the
+                importance vector, filling absent features with 0).
+        """
         self.booster = booster
         scores = booster.get_score(importance_type="gain")
         raw = np.array([scores.get(f"f{i}", 0.0) for i in range(n_features)])
@@ -55,6 +62,7 @@ class _BoosterWrapper:
         self.feature_importances_ = raw / total if total > 0 else raw
 
     def predict(self, X: np.ndarray) -> np.ndarray:
+        """Predict on a feature matrix, wrapping it in a DMatrix first."""
         return self.booster.predict(xgb.DMatrix(X))
 
 
@@ -347,6 +355,15 @@ def predict_latest(model, latest_row: pd.DataFrame) -> float:
 
 
 def feature_importance(model, feature_names: list) -> pd.DataFrame:
+    """Return a feature-importance table sorted descending.
+
+    Args:
+        model: a fitted model exposing ``feature_importances_``.
+        feature_names (list): feature column names aligned to the model.
+
+    Returns:
+        pd.DataFrame: columns ['feature', 'importance'], sorted by importance.
+    """
     scores = model.feature_importances_
     n = min(len(scores), len(feature_names))
     return (

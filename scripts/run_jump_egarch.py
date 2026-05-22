@@ -39,6 +39,7 @@ THRESHOLD_PCT = 0.05  # 5% QLIKE improvement triggers "add to all tickers" flag
 
 
 def _load(ticker: str):
+    """Load price data and engineered features for a ticker over [START, TODAY]."""
     df = load_stock_data(ticker, START, TODAY, cache=True)
     vix_df = load_vix_data(START, TODAY)
     if not vix_df.empty:
@@ -79,6 +80,7 @@ for ticker in ["SPY"]:
     )
 
     def _eval(preds_series, name):
+        """Align a forecast series to the test index and return its metrics dict."""
         yp = preds_series.reindex(test_index).values
         return eval_metrics(y_test, yp, name, spike_thresh)
 
