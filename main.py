@@ -1,8 +1,18 @@
 import argparse
 import json
+import sys
 import numpy as np
 from datetime import date, timedelta
 from pathlib import Path
+
+# Force UTF-8 console output so unicode glyphs (em dashes, ±, warning signs,
+# box-drawing chars) render correctly on Windows, where stdout defaults to
+# cp1252 and would otherwise mangle them or raise UnicodeEncodeError.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")
+    except (AttributeError, ValueError):
+        pass
 
 from src.data_loader import load_stock_data, load_vix_data
 from src.sentiment import fetch_sentiment, fetch_wsb_sentiment
