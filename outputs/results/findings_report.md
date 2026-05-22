@@ -180,3 +180,46 @@ Fixes applied: dynamic prediction clipping, isotonic regression fallback when is
 - Nelson, D. B. (1991). Conditional heteroskedasticity in asset returns: A new approach. *Econometrica*, 59(2), 347–370.
 - Patton, A. J. (2011). Volatility forecast comparison using imperfect volatility proxies. *Journal of Econometrics*, 160(1), 246–256.
 - Barndorff-Nielsen, O. E., Hansen, P. R., Lunde, A., & Shephard, N. (2008). Designing realised kernels to measure the ex-post variation of equity prices in the presence of noise. *Econometrica*, 76(6), 1481–1536.
+
+
+---
+
+## Advanced Hypothesis Tests (Level 2)
+
+Extends the confirmed H1-H8 findings. Primary ticker: MU. Tests flagged *PROXY* use simulated inputs where historical data (option-implied vol, parsed 10-K topic counts) is not stored locally.
+
+| H | Extends | Finding | p-value | Effect | Significant | Actionable |
+|---|---------|---------|---------|--------|-------------|------------|
+| H9 | H1 | Negative asymmetry | 0.4405 | 0.005 | No | Feature: min(sentiment, 0) |
+| H10 | H1 | Velocity vs level | 0.1205 | -0.001 | No | Feature: sentiment_velocity |
+| H11 | H1 | Consensus vs single model | 0.0925 | -0.043 | No | Feature: consensus_count |
+| H12 | H2 | Disagreement half-life | 0.0000 | 0.993 | Yes | Lookback window ~1d |
+| H13 | H2 | EGARCH = early warning | 0.2928 | 0.048 | No | Directional signal (EGARCH=early warning) |
+| H14 | H4 | Asymmetric contagion | 0.2214 | 0.048 | No | Negative-shock weight in contagion model |
+| H15 | H4 | Semi -> Tech contagion | 0.0000 | 0.000 | Yes | Cross-sector lead feature |
+| H16 | H5 | Leverage amplifies in Extreme | -- | -- | -- | Regime-conditional leverage param |
+| H17 | H5+H6 | Monday x negative interaction | 0.0387 | -- | Yes | Feature: monday_negative |
+| H18 | H7+H1 | Pre-earnings anxiety -> spike | 0.0006 | -0.839 | Yes | Options straddle sizing |
+| H19 | H7 | Earnings surprise systematic | 0.1294 | 0.009 | No | IV/RV arbitrage (options mispricing detector) |
+| H20 | H8 | LM delta -> regime shift | 0.5000 | 5.000 | No | Regime-shift detector |
+| H21 | H8 | Topic-specific risk ranking | 0.0000 | -- | Yes | Topic-specific NLP features |
+| H22 | H1+H2 | Triple threat vol ratio | 0.0024 | 1.534 | Yes | Composite danger_flag feature |
+| H23 | H1/H2/H4/H8 | Signal hierarchy | 0.0302 | -- | Yes | Monitoring strategy / feature lags |
+
+### Per-hypothesis conclusions
+
+- **H9** (H1): MU: forward vol Negative=0.430 / Neutral=0.410 / Positive=0.424. KW H=1.64, p=0.4405 (not significant). Dunn Neg-Pos p=0.9306. No clean asymmetry.
+- **H10** (H1): MU: |Spearman| velocity=+0.014 (p=0.5610) vs level=-0.015 (p=0.5229). Steiger Z=1.55, p=0.1205 (not significant). Level is at least as strong.
+- **H11** (H1): MU: high-consensus (>=3) mean fwd vol=0.426 vs low (<=1)=0.410. Mann-Whitney U=206578, p=0.0925 (not significant), r=-0.043. Consensus not decisive.
+- **H12** (H2): MU: AR(1) phi=0.498 (p=0.0000, ** significant **), half-life=1.0d, mean-reversion speed=0.502. Regime half-lives: Elevated=1.2d, High=0.7d, Extreme=1.1d.
+- **H13** (H2): MU: after EGARCH_HIGH, 51% of windows show vol UP (sign p=0.4566); after ML_HIGH, 54% show vol DOWN (sign p=0.2928). No clean directional split.
+- **H14** (H4): NVDA->['MU', 'AMD']: MU: b1=0.067(p=0.032), b2=0.026(p=0.578); AMD: b1=0.016(p=0.658), b2=0.069(p=0.221). No significant asymmetry.
+- **H15** (H4): Net-contagion ranking (out-in): Semiconductor=+0, Financial=+0, Energy=+0, Tech=+0. SOURCE = Semiconductor; RECEIVER = Tech. min p=0.0000.
+- **H16** (H5): MU: leverage ratios by regime [Elevated=1.21, High=1.04, Extreme=1.01]. Extreme-vs-Low diff=nan, permutation p=nan (inconclusive (insufficient data)). No significant amplification.
+- **H17** (H5+H6): MU: SRH Monday p=0.8524 (H6), return-sign p=0.4041 (H5), interaction p=0.0387 (** significant **). Monday vol is specifically driven by negative returns.
+- **H18** (H7+H1): MU (12 events): Spearman(pre-sentiment, spike)=-0.839, p=0.0006 (** significant **). Anxious-vs-optimistic spike MW p=0.0045. Pre-earnings anxiety predicts larger spikes.
+- **H19** (H7): MU (12 events) [PROXY IV]: median earnings surprise (RV-IV premium)=+0.009, Wilcoxon W=19.0, p=0.1294 (not significant). No systematic mispricing detected.
+- **H20** (H8): MU: 4 filing transitions. 2x2 [up&worse=1, up&ok=1, calm&worse=0, calm&ok=2]. Fisher p=0.5000 (not significant), OR=5.00 (95% CI [0.11, 220.64]). No significant lead relationship.
+- **H21** (H8): Most-predictive topic per ticker [PROXY topics]: MU:supply_chain(r=+0.41); NVDA:supply_chain(r=+0.47); AMD:geopolitical(r=+0.45); JPM:financial(r=+0.27); BAC:financial(r=+0.29); XOM:geopolitical(r=+0.40). Best topic-vs-generic Steiger min p=0.0000 (** significant **).
+- **H22** (H1+H2): MU: triple-threat mean vol=0.411 vs all-clear=0.268 (ratio=1.53x). MW p=0.0024 (** significant **); 3-way interaction p=0.9209. Composite danger flag justified.
+- **H23** (H1/H2/H4/H8): MU (174 spikes): median lead contagion=10.0d, disagreement=7.5d, sentiment=7.0d. First-mover: contagion. Friedman p=0.0302 (** significant **). Hierarchy (earliest first): contagion -> disagreement -> sentiment.

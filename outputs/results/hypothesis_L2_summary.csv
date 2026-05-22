@@ -1,0 +1,16 @@
+H,Extends,Finding,p_value,Effect,Significant,Actionable
+H9,H1,Negative asymmetry,0.4405,0.005,No,"Feature: min(sentiment, 0)"
+H10,H1,Velocity vs level,0.1205,-0.001,No,Feature: sentiment_velocity
+H11,H1,Consensus vs single model,0.0925,-0.043,No,Feature: consensus_count
+H12,H2,Disagreement half-life,0.0000,0.993,Yes,Lookback window ~1d
+H13,H2,EGARCH = early warning,0.2928,0.048,No,Directional signal (EGARCH=early warning)
+H14,H4,Asymmetric contagion,0.2214,0.048,No,Negative-shock weight in contagion model
+H15,H4,Semi -> Tech contagion,0.0000,0.000,Yes,Cross-sector lead feature
+H16,H5,Leverage amplifies in Extreme,--,--,--,Regime-conditional leverage param
+H17,H5+H6,Monday x negative interaction,0.0387,--,Yes,Feature: monday_negative
+H18,H7+H1,Pre-earnings anxiety -> spike,0.0006,-0.839,Yes,Options straddle sizing
+H19,H7,Earnings surprise systematic,0.1294,0.009,No,IV/RV arbitrage (options mispricing detector)
+H20,H8,LM delta -> regime shift,0.5000,5.000,No,Regime-shift detector
+H21,H8,Topic-specific risk ranking,0.0000,--,Yes,Topic-specific NLP features
+H22,H1+H2,Triple threat vol ratio,0.0024,1.534,Yes,Composite danger_flag feature
+H23,H1/H2/H4/H8,Signal hierarchy,0.0302,--,Yes,Monitoring strategy / feature lags
