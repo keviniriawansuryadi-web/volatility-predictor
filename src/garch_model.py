@@ -1,4 +1,3 @@
-import warnings
 import numpy as np
 import pandas as pd
 from arch import arch_model
@@ -103,11 +102,11 @@ def fit_jump_egarch(
     print(f"  Fitting Jump-EGARCH on {split} obs, forecasting {n - split} steps...")
 
     for i in range(split, n):
-        window_r    = returns_scaled.iloc[:i].values
+        window_r = returns_scaled.iloc[:i].values
         window_jump = jump_flags.iloc[:i].values.reshape(-1, 1).astype(float)
         try:
-            am  = arch_model(window_r, vol="EGARCH", p=1, q=1, dist="normal",
-                             x=window_jump)
+            am = arch_model(window_r, vol="EGARCH", p=1, q=1, dist="normal",
+                            x=window_jump)
             res = am.fit(disp="off", show_warning=False)
 
             # For the forecast, we need the next-step jump value.
@@ -120,10 +119,10 @@ def fit_jump_egarch(
         except Exception:
             # Fall back to standard EGARCH without x if augmented fit fails
             try:
-                am2  = arch_model(window_r, vol="EGARCH", p=1, q=1, dist="normal")
+                am2 = arch_model(window_r, vol="EGARCH", p=1, q=1, dist="normal")
                 res2 = am2.fit(disp="off", show_warning=False)
-                fc2  = res2.forecast(horizon=forecast_horizon, reindex=False,
-                                     method="simulation", simulations=20)
+                fc2 = res2.forecast(horizon=forecast_horizon, reindex=False,
+                                    method="simulation", simulations=20)
                 var_h2 = fc2.variance.values[-1, -1]
                 forecasts[returns.index[i]] = np.sqrt(var_h2) / 100 * np.sqrt(252)
             except Exception:

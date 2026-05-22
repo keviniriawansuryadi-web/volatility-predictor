@@ -14,7 +14,7 @@ from datetime import date, timedelta
 
 from src.data_loader import load_stock_data, load_vix_data
 from src.sentiment import fetch_sentiment
-from src.features import build_features, latest_feature_row, FEATURE_COLS
+from src.features import build_features, latest_feature_row
 from src.garch_model import rolling_garch_forecast, garch_latest_forecast, garch_in_sample_vol
 from src.har_model import har_rv_forecast
 from src.ml_model import train_and_predict, predict_latest, feature_importance
@@ -31,6 +31,7 @@ st.set_page_config(
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
+
 def _qlike(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     h = np.maximum(y_pred, 1e-8) ** 2
     s2 = y_true ** 2
@@ -38,11 +39,15 @@ def _qlike(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
 
 def _regime(v: float):
-    if v > 0.35: return "EXTREME",  "#c0392b"
-    if v > 0.25: return "HIGH",     "#e67e22"
-    if v > 0.15: return "ELEVATED", "#f1c40f"
-    if v > 0.10: return "MODERATE", "#2980b9"
-    return              "LOW",      "#7f8c8d"
+    if v > 0.35:
+        return "EXTREME", "#c0392b"
+    if v > 0.25:
+        return "HIGH", "#e67e22"
+    if v > 0.15:
+        return "ELEVATED", "#f1c40f"
+    if v > 0.10:
+        return "MODERATE", "#2980b9"
+    return "LOW", "#7f8c8d"
 
 
 def build_metrics(y_true, aligned_preds, spike_thresh):
@@ -56,10 +61,10 @@ def build_metrics(y_true, aligned_preds, spike_thresh):
         sa = float((ypm[sm] > spike_thresh).mean()) if sm.sum() > 0 else float("nan")
         rows.append({
             "Model": name,
-            "RMSE":  round(float(np.sqrt(np.mean((yt - ypm) ** 2))), 4),
-            "MAE":   round(float(np.mean(np.abs(yt - ypm))), 4),
+            "RMSE": round(float(np.sqrt(np.mean((yt - ypm) ** 2))), 4),
+            "MAE": round(float(np.mean(np.abs(yt - ypm))), 4),
             "QLIKE": round(_qlike(yt, ypm), 4),
-            "Corr":  round(float(np.corrcoef(yt, ypm)[0, 1]), 4),
+            "Corr": round(float(np.corrcoef(yt, ypm)[0, 1]), 4),
             "Spike Acc": f"{sa:.1%}" if not np.isnan(sa) else "n/a",
         })
     return pd.DataFrame(rows).set_index("Model")
@@ -105,7 +110,7 @@ def make_forecast_fig(index, y_true, aligned_preds, spike_thresh, ticker):
     for (name, yp), c in zip(aligned_preds.items(), colors):
         mv = ~np.isnan(yp)
         ax3.scatter(y_true[~spike & mv], yp[~spike & mv], color=c, alpha=0.2, s=10)
-        ax3.scatter(y_true[spike & mv],  yp[spike & mv],  color=c, alpha=0.9, s=40, marker="*")
+        ax3.scatter(y_true[spike & mv], yp[spike & mv], color=c, alpha=0.9, s=40, marker="*")
     ax3.set_xlabel("Realized Vol", fontsize=9)
     ax3.set_ylabel("Predicted Vol", fontsize=9)
     ax3.set_title("Predicted vs Realized  (★ = spike days > 90th pct)", fontsize=11)
@@ -119,7 +124,7 @@ def make_shap_fig(model, X_test, feature_names, ticker):
     try:
         import shap
         underlying = model.get_booster() if hasattr(model, "get_booster") else \
-                     (model.booster if hasattr(model, "booster") else model)
+            (model.booster if hasattr(model, "booster") else model)
         explainer = shap.TreeExplainer(underlying)
         sv = explainer.shap_values(X_test)
         n = min(len(sv[0]), len(feature_names))
@@ -140,7 +145,7 @@ def make_shap_fig(model, X_test, feature_names, ticker):
         ax.set_xlabel("Mean |SHAP value|", fontsize=9)
         plt.tight_layout()
         return fig
-    except Exception as e:
+    except Exception:
         return None
 
 
@@ -154,10 +159,10 @@ with st.sidebar:
 
     c1, c2 = st.columns(2)
     start_d = c1.date_input("Start", value=date.today() - timedelta(days=5 * 365))
-    end_d   = c2.date_input("End",   value=date.today())
+    end_d = c2.date_input("End", value=date.today())
 
-    horizon    = st.slider("Forecast Horizon (days)", 1, 21, 5)
-    train_pct  = st.slider("Training Data (%)", 50, 95, 80, step=5)
+    horizon = st.slider("Forecast Horizon (days)", 1, 21, 5)
+    train_pct = st.slider("Training Data (%)", 50, 95, 80, step=5)
     train_size = train_pct / 100
     garch_type = st.selectbox("GARCH Variant", ["EGARCH", "GARCH"])
 
@@ -198,10 +203,10 @@ if not run_btn and "results" not in st.session_state:
 # ── run pipeline ──────────────────────────────────────────────────────────────
 if run_btn:
     start_str = start_d.isoformat()
-    end_str   = end_d.isoformat()
+    end_str = end_d.isoformat()
 
     prog = st.progress(0)
-    msg  = st.empty()
+    msg = st.empty()
 
     try:
         msg.text("⬇  Downloading price data...")
@@ -256,28 +261,28 @@ if run_btn:
 
         msg.text("📊  Computing metrics & live signal...")
         prog.progress(90)
-        split    = int(len(feat_df) * train_size)
-        test_df  = feat_df.iloc[split:]
-        y_true   = test_df["target"].values
+        split = int(len(feat_df) * train_size)
+        test_df = feat_df.iloc[split:]
+        y_true = test_df["target"].values
         spike_th = float(np.nanpercentile(y_true, 90))
 
         forecasts = {
-            garch_type:      garch_preds,
-            "HAR-RV":        har_preds,
-            "XGBoost":       xgb_preds,
+            garch_type: garch_preds,
+            "HAR-RV": har_preds,
+            "XGBoost": xgb_preds,
             "XGB-Asymmetric": xgb_asym_preds,
-            "RandomForest":  rf_preds,
+            "RandomForest": rf_preds,
         }
         aligned = {n: s.reindex(test_df.index).values for n, s in forecasts.items()}
         metrics_df = build_metrics(y_true, aligned, spike_th)
 
         # live signal
-        latest_row  = latest_feature_row(df)
-        xgb_now     = predict_latest(xgb_model, latest_row)
+        latest_row = latest_feature_row(df)
+        xgb_now = predict_latest(xgb_model, latest_row)
         xgb_asym_now = predict_latest(xgb_asym_model, latest_row)
-        rf_now      = predict_latest(rf_model, latest_row)
-        garch_now   = garch_latest_forecast(df["log_return"], horizon, garch_type)
-        ensemble    = float(np.nanmean([xgb_now, xgb_asym_now, rf_now, garch_now]))
+        rf_now = predict_latest(rf_model, latest_row)
+        garch_now = garch_latest_forecast(df["log_return"], horizon, garch_type)
+        ensemble = float(np.nanmean([xgb_now, xgb_asym_now, rf_now, garch_now]))
 
         hyp = spike_sentiment_test(feat_df)
 
@@ -305,7 +310,8 @@ if run_btn:
         st.success(f"Pipeline complete — {len(df)} trading days loaded.")
 
     except Exception as e:
-        prog.empty(); msg.empty()
+        prog.empty()
+        msg.empty()
         st.error(f"Pipeline error: {e}")
         st.exception(e)
         st.stop()
@@ -315,9 +321,9 @@ if run_btn:
 if "results" not in st.session_state:
     st.stop()
 
-R   = st.session_state["results"]
-L   = R["live"]
-gt  = R["garch_type"]
+R = st.session_state["results"]
+L = R["live"]
+gt = R["garch_type"]
 tkr = R["ticker"]
 
 regime_label, regime_color = _regime(L["ensemble"])
@@ -326,12 +332,12 @@ st.markdown(f"## {tkr}  ·  {L['date']}")
 
 # ── live signal cards ─────────────────────────────────────────────────────────
 c1, c2, c3, c4, c5, c6 = st.columns(6)
-c1.metric("Price",          f"${L['price']:.2f}")
+c1.metric("Price", f"${L['price']:.2f}")
 c2.metric("21d Realized Vol", f"{L['rv']:.1%}")
-c3.metric("XGBoost",        f"{L['xgb']:.1%}")
+c3.metric("XGBoost", f"{L['xgb']:.1%}")
 c4.metric("XGB-Asymmetric", f"{L['xgb_asym']:.1%}")
-c5.metric(gt,               f"{L['garch']:.1%}")
-c6.metric("Ensemble",       f"{L['ensemble']:.1%}")
+c5.metric(gt, f"{L['garch']:.1%}")
+c6.metric("Ensemble", f"{L['ensemble']:.1%}")
 
 st.markdown(
     f"<div style='background:{regime_color};color:white;padding:10px 22px;"
@@ -396,7 +402,7 @@ with tab2:
         st.subheader("Feature Importance Table")
         st.dataframe(
             R["fi_df"].head(20)
-              .style.bar(subset=["importance"], color="#2980b9"),
+            .style.bar(subset=["importance"], color="#2980b9"),
             use_container_width=True,
         )
         st.caption("Gain-based importance from XGBoost. SHAP chart (left) uses model-level attribution.")

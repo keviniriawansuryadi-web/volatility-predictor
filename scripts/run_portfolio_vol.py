@@ -23,40 +23,39 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.stdout.reconfigure(encoding="utf-8")
 warnings.filterwarnings("ignore")
 
-import numpy as np
 import pandas as pd
 
 from src.data_loader import load_stock_data
 from src.portfolio import compute_portfolio_vol_forecast, build_correlation_matrix
 from config import TICKERS
 
-TODAY    = date.today().isoformat()
-START    = (date.today() - timedelta(days=5 * 365)).isoformat()
-OUT_DIR  = Path(__file__).parent.parent / "outputs" / "results"
+TODAY = date.today().isoformat()
+START = (date.today() - timedelta(days=5 * 365)).isoformat()
+OUT_DIR = Path(__file__).parent.parent / "outputs" / "results"
 LIVE_DIR = Path(__file__).parent.parent / "outputs"
 
 # S&P 500 approximate market-cap weights for the 10 covered tickers
 # (proportional to 2026 approximate market caps, normalised to sum < 1;
 #  remainder goes to "other" — we simply re-normalise within the 10)
 MARKET_CAP_WEIGHTS = {
-    "AAPL":  0.22,
-    "MSFT":  0.20,
-    "AMZN":  0.12,
-    "NVDA":  0.11,
-    "JPM":   0.08,
-    "XOM":   0.06,
-    "BAC":   0.05,
-    "AMD":   0.04,
-    "CVX":   0.04,
-    "MU":    0.03,
+    "AAPL": 0.22,
+    "MSFT": 0.20,
+    "AMZN": 0.12,
+    "NVDA": 0.11,
+    "JPM": 0.08,
+    "XOM": 0.06,
+    "BAC": 0.05,
+    "AMD": 0.04,
+    "CVX": 0.04,
+    "MU": 0.03,
 }
 
 EQUAL_WEIGHTS = {t: 1.0 / len(TICKERS) for t in TICKERS}
 
 # ── Load forecasts from live signal JSONs ────────────────────────────────────
 print(f"\n{'='*65}")
-print(f"  PORTFOLIO VOL FORECAST")
-print(f"  Loading live signals from outputs/live_signal_*_2026-05-15.json")
+print("  PORTFOLIO VOL FORECAST")
+print("  Loading live signals from outputs/live_signal_*_2026-05-15.json")
 print(f"{'='*65}")
 
 forecasts_ensemble: dict[str, float] = {}
@@ -85,7 +84,7 @@ if spy_json:
     print(f"\n  [SPY] ensemble={spy_forecast:.1%}  (from {spy_json[-1].name})")
 
 # ── Build correlation matrix (last 60d returns) ──────────────────────────────
-print(f"\n  Building 60-day return correlation matrix...")
+print("\n  Building 60-day return correlation matrix...")
 returns_dict = {}
 for ticker in forecasts_ensemble:
     try:
@@ -119,4 +118,4 @@ for scheme, weights in [("Equal weights (1/N)", EQUAL_WEIGHTS), ("Market-cap wei
     out_path.write_text(json.dumps(serializable, indent=2), encoding="utf-8")
     print(f"  Saved: {out_path}")
 
-print(f"\n  Section 6 COMPLETE.")
+print("\n  Section 6 COMPLETE.")

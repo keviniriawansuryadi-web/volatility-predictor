@@ -19,22 +19,24 @@ import numpy as np
 import pandas as pd
 import warnings
 from pathlib import Path
-from typing import Callable
 
 
 REGIME_BOUNDS = {"Low": 0.15, "Elevated": 0.25, "High": 0.35}
-REGIME_ORDER  = ["Low", "Elevated", "High", "Extreme"]
+REGIME_ORDER = ["Low", "Elevated", "High", "Extreme"]
 
 
 def _label_regime(vol: float) -> str:
-    if vol >= REGIME_BOUNDS["High"]:     return "Extreme"
-    if vol >= REGIME_BOUNDS["Elevated"]: return "High"
-    if vol >= REGIME_BOUNDS["Low"]:      return "Elevated"
+    if vol >= REGIME_BOUNDS["High"]:
+        return "Extreme"
+    if vol >= REGIME_BOUNDS["Elevated"]:
+        return "High"
+    if vol >= REGIME_BOUNDS["Low"]:
+        return "Elevated"
     return "Low"
 
 
 def _qlike(y_true: np.ndarray, y_pred: np.ndarray) -> float:
-    h  = np.maximum(y_pred, 1e-8) ** 2
+    h = np.maximum(y_pred, 1e-8) ** 2
     s2 = y_true ** 2
     return float(np.mean(s2 / h - np.log(s2 / h) - 1))
 
@@ -75,7 +77,7 @@ def regime_conditional_performance(
     pd.DataFrame  with columns [model, regime, n_obs, QLIKE].
     Rows are sorted by (model, regime) using REGIME_ORDER.
     """
-    split   = int(len(feat_df) * train_size)
+    split = int(len(feat_df) * train_size)
     test_df = feat_df.iloc[split:].copy()
 
     if vol_col not in test_df.columns:
@@ -93,13 +95,13 @@ def regime_conditional_performance(
         if len(common) < 5:
             warnings.warn(f"[regime_perf] {label}: fewer than 5 common test observations — skipping")
             continue
-        yt_all  = y_test.reindex(common)
-        yp_all  = preds.reindex(common)
+        yt_all = y_test.reindex(common)
+        yp_all = preds.reindex(common)
         reg_all = test_df["_regime"].reindex(common)
 
         for regime in REGIME_ORDER:
             mask = reg_all == regime
-            n    = mask.sum()
+            n = mask.sum()
             if n < 3:
                 qlike = np.nan
             else:

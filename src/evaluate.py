@@ -290,23 +290,23 @@ def plot_shap_worst_prediction(
         worst_idx = int(np.argmax(under_error))
 
         actual = float(y_test[worst_idx])
-        pred   = float(preds[worst_idx])
-        error  = float(under_error[worst_idx])
+        pred = float(preds[worst_idx])
+        error = float(under_error[worst_idx])
 
         shap_row = shap_vals[worst_idx]        # (n_features,)
         n = min(len(shap_row), len(feature_names))
 
         # Sort features by absolute SHAP contribution for the worst row
-        order   = np.argsort(np.abs(shap_row[:n]))[::-1]
+        order = np.argsort(np.abs(shap_row[:n]))[::-1]
         top_feats = [(feature_names[i], float(shap_row[i])) for i in order[:10]]
 
         # Build waterfall-style bar chart (matplotlib, no shap.plots dependency)
-        top_n    = min(10, n)
+        top_n = min(10, n)
         top_names = [feature_names[i] for i in order[:top_n]]
-        top_vals  = [shap_row[i] for i in order[:top_n]]
+        top_vals = [shap_row[i] for i in order[:top_n]]
         # Reverse so most important is at the top
         top_names = top_names[::-1]
-        top_vals  = top_vals[::-1]
+        top_vals = top_vals[::-1]
 
         colors = ["#d62728" if v < 0 else "#1f77b4" for v in top_vals]
 
@@ -329,10 +329,10 @@ def plot_shap_worst_prediction(
         print(f"SHAP worst-prediction plot saved: {out}")
 
         return {
-            "worst_idx":   worst_idx,
-            "actual":      actual,
-            "pred":        pred,
-            "error":       error,
+            "worst_idx": worst_idx,
+            "actual": actual,
+            "pred": pred,
+            "error": error,
             "top_features": top_feats[:3],
         }
 

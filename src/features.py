@@ -88,7 +88,7 @@ def _add_features(df: pd.DataFrame) -> pd.DataFrame:
 
     # WSB sentiment features (when wsb_sentiment column exists in df)
     if "wsb_sentiment" in feat.columns:
-        feat["wsb_sentiment_3d"]   = feat["wsb_sentiment"].rolling(3).mean()
+        feat["wsb_sentiment_3d"] = feat["wsb_sentiment"].rolling(3).mean()
         feat["wsb_sentiment_lag1"] = feat["wsb_sentiment"].shift(1)
 
     # VIX term structure features (populated when load_vix_term_structure() is used)

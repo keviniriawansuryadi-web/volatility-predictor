@@ -18,11 +18,8 @@ import numpy as np
 import pandas as pd
 import scipy.stats as stats
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-import seaborn as sns
 import plotly.graph_objects as go
 import plotly.express as px
-from plotly.subplots import make_subplots
 import plotly.io as pio
 from statsmodels.tsa.stattools import grangercausalitytests
 import scikit_posthocs as sp
@@ -35,6 +32,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 # ============================================================================ #
 # H1 -- SPIKE DAYS PRECEDED BY NEGATIVE SENTIMENT
 # ============================================================================ #
+
 
 def test_spike_sentiment(
     df: pd.DataFrame,
@@ -61,8 +59,8 @@ def test_spike_sentiment(
     threshold = combined["realized_vol_21d"].quantile(spike_pct)
 
     spike_mask = combined["realized_vol_21d"] >= threshold
-    spike_sent   = combined.loc[spike_mask,   "vader_compound"].values
-    nospike_sent = combined.loc[~spike_mask,  "vader_compound"].values
+    spike_sent = combined.loc[spike_mask, "vader_compound"].values
+    nospike_sent = combined.loc[~spike_mask, "vader_compound"].values
 
     t_stat, p_val = stats.ttest_ind(spike_sent, nospike_sent)
 
@@ -203,7 +201,7 @@ def test_granger_causality(
         .dropna()
         .sort_index()
     )
-    vol  = combined[vol_col].values
+    vol = combined[vol_col].values
     sent_vals = combined[sent_col].values
 
     rows = []
@@ -220,7 +218,7 @@ def test_granger_causality(
         for lag in lags:
             if lag in gc_res:
                 f_stat = gc_res[lag][0]["ssr_ftest"][0]
-                p_val  = gc_res[lag][0]["ssr_ftest"][1]
+                p_val = gc_res[lag][0]["ssr_ftest"][1]
                 rows.append(dict(direction=direction, lag=lag,
                                  F=round(f_stat, 4), p_value=round(p_val, 4)))
 
@@ -236,7 +234,7 @@ def test_granger_causality(
         f"Dominant Granger direction: {dominant}."
     )
     print(f"\n{'-'*55}")
-    print(f"  H3: Granger Causality")
+    print("  H3: Granger Causality")
     print(f"{'-'*55}")
     print(result_df.to_string(index=False))
     print(f"  {conclusion}")
@@ -282,12 +280,12 @@ def test_monday_effect(
     Visualized as a boxplot with significance annotation.
     """
     data = df[[vol_col]].dropna().copy()
-    data["weekday"]      = data.index.dayofweek          # 0=Mon ... 4=Fri
+    data["weekday"] = data.index.dayofweek          # 0=Mon ... 4=Fri
     data["weekday_name"] = data.index.day_name()
 
-    day_order  = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-    groups     = [data.loc[data["weekday_name"] == d, vol_col].values for d in day_order]
-    groups     = [g for g in groups if len(g) > 0]
+    day_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+    groups = [data.loc[data["weekday_name"] == d, vol_col].values for d in day_order]
+    groups = [g for g in groups if len(g) > 0]
 
     h_stat, p_val = stats.kruskal(*groups)
 
@@ -304,7 +302,7 @@ def test_monday_effect(
         f"eta2={effect_size:.3f}."
     )
     print(f"\n{'-'*55}")
-    print(f"  H4: Monday Effect -- Kruskal-Wallis")
+    print("  H4: Monday Effect -- Kruskal-Wallis")
     print(f"  {conclusion}")
     print("\n  Dunn post-hoc p-values (Holm corrected):")
     print(dunn.to_string())
@@ -370,15 +368,15 @@ def test_earnings_vol(
 
     for ed in earnings_dates:
         pos = trading_days.searchsorted(ed)
-        lo  = max(0, pos - window)
-        hi  = min(len(trading_days), pos + window + 1)
+        lo = max(0, pos - window)
+        hi = min(len(trading_days), pos + window + 1)
         earnings_mask.iloc[lo:hi] = True
 
     data = df[[vol_col]].copy()
     data["earnings_week"] = earnings_mask.values
 
-    ew   = data.loc[data["earnings_week"],  vol_col].dropna().values
-    non  = data.loc[~data["earnings_week"], vol_col].dropna().values
+    ew = data.loc[data["earnings_week"], vol_col].dropna().values
+    non = data.loc[~data["earnings_week"], vol_col].dropna().values
 
     if len(ew) == 0:
         print("  H5: No earnings dates found -- skipping permutation test.")
@@ -452,20 +450,20 @@ def test_vix_regime_accuracy(
 
     aligned = pd.DataFrame({
         "target": feat_df["target"],
-        "pred":   xgb_forecast,
-        "vix":    vix,
+        "pred": xgb_forecast,
+        "vix": vix,
     }).dropna()
 
     aligned["abs_error"] = np.abs(aligned["target"] - aligned["pred"])
     vix_med = aligned["vix"].median()
     aligned["vix_regime"] = np.where(aligned["vix"] >= vix_med, "High VIX", "Low VIX")
 
-    low_err  = aligned.loc[aligned["vix_regime"] == "Low VIX",  "abs_error"].values
+    low_err = aligned.loc[aligned["vix_regime"] == "Low VIX", "abs_error"].values
     high_err = aligned.loc[aligned["vix_regime"] == "High VIX", "abs_error"].values
 
-    rmse_low  = np.sqrt(mean_squared_error(
-        aligned.loc[aligned["vix_regime"] == "Low VIX",  "target"],
-        aligned.loc[aligned["vix_regime"] == "Low VIX",  "pred"],
+    rmse_low = np.sqrt(mean_squared_error(
+        aligned.loc[aligned["vix_regime"] == "Low VIX", "target"],
+        aligned.loc[aligned["vix_regime"] == "Low VIX", "pred"],
     ))
     rmse_high = np.sqrt(mean_squared_error(
         aligned.loc[aligned["vix_regime"] == "High VIX", "target"],
@@ -550,7 +548,7 @@ def test_10k_risk_language(
     tercile_67 = lm_risk_scores.quantile(0.67)
 
     high_filings = lm_risk_scores[lm_risk_scores >= tercile_67].index
-    low_filings  = lm_risk_scores[lm_risk_scores <= tercile_33].index
+    low_filings = lm_risk_scores[lm_risk_scores <= tercile_33].index
 
     def _post_vol(filing_group):
         vols = []
@@ -562,7 +560,7 @@ def test_10k_risk_language(
         return np.array(vols)
 
     high_vols = _post_vol(high_filings)
-    low_vols  = _post_vol(low_filings)
+    low_vols = _post_vol(low_filings)
 
     if len(high_vols) == 0 or len(low_vols) == 0:
         conclusion = "Insufficient filing data for H7."
@@ -574,7 +572,7 @@ def test_10k_risk_language(
     rng = np.random.default_rng(seed)
     boot_diffs = np.array([
         rng.choice(high_vols, len(high_vols), replace=True).mean()
-        - rng.choice(low_vols,  len(low_vols),  replace=True).mean()
+        - rng.choice(low_vols, len(low_vols), replace=True).mean()
         for _ in range(n_bootstrap)
     ])
     ci_lo, ci_hi = np.percentile(boot_diffs, [2.5, 97.5])
@@ -603,13 +601,13 @@ def test_10k_risk_language(
         return pd.DataFrame({
             "day": np.arange(min_len),
             "mean": mat.mean(axis=0),
-            "lo":   np.percentile(mat, 2.5,  axis=0),
-            "hi":   np.percentile(mat, 97.5, axis=0),
+            "lo": np.percentile(mat, 2.5, axis=0),
+            "hi": np.percentile(mat, 97.5, axis=0),
             "group": label,
         })
 
     high_ts = _rolling_post_vol_series(high_filings, "High LM Risk")
-    low_ts  = _rolling_post_vol_series(low_filings,  "Low LM Risk")
+    low_ts = _rolling_post_vol_series(low_filings, "Low LM Risk")
 
     fig = go.Figure()
     for ts, color in [(high_ts, "#e74c3c"), (low_ts, "#3498db")]:
@@ -624,7 +622,7 @@ def test_10k_risk_language(
             x=pd.concat([ts["day"], ts["day"][::-1]]),
             y=pd.concat([ts["hi"], ts["lo"][::-1]]),
             fill="toself", fillcolor=color.replace(")", ",0.15)").replace("rgb", "rgba")
-                if color.startswith("rgb") else color + "30",
+            if color.startswith("rgb") else color + "30",
             line=dict(color="rgba(255,255,255,0)"),
             showlegend=False, name=f"{lbl} CI",
         ))
@@ -665,7 +663,6 @@ def test_sentiment_mean_reversion(
     Event study plot shows average sentiment trajectory from t-5 to t+10.
     """
     s = sent[sent_col].values
-    idx = sent.index
 
     extreme_mask = s < extreme_threshold
     extreme_positions = np.where(extreme_mask)[0]
@@ -683,7 +680,7 @@ def test_sentiment_mean_reversion(
 
     w_stat, p_val = stats.wilcoxon(t_vals, t3_vals, alternative="less")
 
-    mean_t  = np.mean(t_vals)
+    mean_t = np.mean(t_vals)
     mean_t3 = np.mean(t3_vals)
     conclusion = (
         f"Extreme negative days: mean sentiment = {mean_t:.3f} -> {mean_t3:.3f} "
@@ -704,7 +701,7 @@ def test_sentiment_mean_reversion(
 
     mat = np.array(trajectories, dtype=float)
     mean_traj = np.nanmean(mat, axis=0)
-    se_traj   = np.nanstd(mat, axis=0) / np.sqrt((~np.isnan(mat)).sum(axis=0).clip(1))
+    se_traj = np.nanstd(mat, axis=0) / np.sqrt((~np.isnan(mat)).sum(axis=0).clip(1))
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(
@@ -789,7 +786,7 @@ def analyze_variance_risk_premium(
 
     # Current VRP state
     current_vix = float(df["vix_level"].iloc[-1])
-    current_rv  = float(df["realized_vol_21d"].iloc[-1])
+    current_rv = float(df["realized_vol_21d"].iloc[-1])
     current_vrp = current_vix - current_rv
 
     vrp_sign = "NEGATIVE (RV > VIX)" if current_vrp < 0 else f"POSITIVE ({current_vix:.1%} - {current_rv:.1%})"
@@ -852,7 +849,6 @@ def analyze_variance_risk_premium(
     ax1 = axes[0]
     ax1.plot(vrp.index, vrp.values, linewidth=1, color="#3498db", label="VRP")
     ax1.axhline(0, color="black", linewidth=0.8, linestyle="--")
-    neg_dates = vrp[vrp < 0]
     ax1.fill_between(vrp.index, vrp.values, 0, where=(vrp < 0),
                      alpha=0.4, color="#e74c3c", label="Negative VRP (RV > VIX)")
     ax1.set_ylabel("VRP (VIX - RV21d)")

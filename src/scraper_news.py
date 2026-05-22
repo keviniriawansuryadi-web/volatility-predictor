@@ -15,7 +15,6 @@ never deleted, so the historical window grows with every run.
 
 from __future__ import annotations
 
-import json
 import warnings
 import re
 from datetime import datetime, timedelta
@@ -37,8 +36,8 @@ try:
 except ImportError:
     _HAS_BS4 = False
 
-CACHE_DIR    = Path(__file__).parent.parent / "data" / "news"
-_HEADERS     = {
+CACHE_DIR = Path(__file__).parent.parent / "data" / "news"
+_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -47,7 +46,7 @@ _HEADERS     = {
     "Accept-Language": "en-US,en;q=0.9",
 }
 _WSB_HEADERS = {"User-Agent": "volatility-research/1.0"}
-_TIMEOUT     = 15
+_TIMEOUT = 15
 
 
 # ─── internal helpers ──────────────────────────────────────────────────────────
@@ -86,40 +85,40 @@ def _parse_feed(url: str, name: str) -> list[dict]:
 # ─── Source A: General RSS feeds (filter by ticker mention) ───────────────────
 
 _RSS_GENERAL = {
-    "cnbc_markets":    "https://www.cnbc.com/id/100003114/device/rss/rss.html",
-    "cnbc_finance":    "https://www.cnbc.com/id/10001147/device/rss/rss.html",
-    "cnbc_tech":       "https://www.cnbc.com/id/19854910/device/rss/rss.html",
-    "cnbc_business":   "https://www.cnbc.com/id/10001109/device/rss/rss.html",
-    "cnbc_economy":    "https://www.cnbc.com/id/20910258/device/rss/rss.html",
-    "reuters_business":"https://feeds.reuters.com/reuters/businessNews",
+    "cnbc_markets": "https://www.cnbc.com/id/100003114/device/rss/rss.html",
+    "cnbc_finance": "https://www.cnbc.com/id/10001147/device/rss/rss.html",
+    "cnbc_tech": "https://www.cnbc.com/id/19854910/device/rss/rss.html",
+    "cnbc_business": "https://www.cnbc.com/id/10001109/device/rss/rss.html",
+    "cnbc_economy": "https://www.cnbc.com/id/20910258/device/rss/rss.html",
+    "reuters_business": "https://feeds.reuters.com/reuters/businessNews",
     "marketwatch_top": "https://www.marketwatch.com/rss/topstories",
-    "marketwatch_rt":  "https://www.marketwatch.com/rss/realtimeheadlines",
+    "marketwatch_rt": "https://www.marketwatch.com/rss/realtimeheadlines",
 }
 
 
 _TICKER_ALIASES: dict[str, list[str]] = {
-    "SPY":  ["SPY", "S&P 500", "S&P500", "SPDR", "SP500"],
-    "QQQ":  ["QQQ", "NASDAQ", "Nasdaq 100"],
+    "SPY": ["SPY", "S&P 500", "S&P500", "SPDR", "SP500"],
+    "QQQ": ["QQQ", "NASDAQ", "Nasdaq 100"],
     "AAPL": ["AAPL", "Apple"],
     "MSFT": ["MSFT", "Microsoft"],
     "AMZN": ["AMZN", "Amazon"],
     "NVDA": ["NVDA", "Nvidia", "NVIDIA"],
     "TSLA": ["TSLA", "Tesla"],
-    "GOOGL":["GOOGL", "Alphabet", "Google"],
+    "GOOGL": ["GOOGL", "Alphabet", "Google"],
     "META": ["META", "Meta", "Facebook"],
-    "JPM":  ["JPM", "JPMorgan", "JP Morgan"],
-    "BAC":  ["BAC", "Bank of America"],
-    "GS":   ["GS", "Goldman Sachs", "Goldman"],
-    "XOM":  ["XOM", "ExxonMobil", "Exxon"],
-    "CVX":  ["CVX", "Chevron"],
-    "AMD":  ["AMD"],
-    "MU":   ["MU", "Micron"],
-    "PFE":  ["PFE", "Pfizer"],
-    "GLD":  ["GLD", "Gold"],
-    "TLT":  ["TLT", "Treasury"],
-    "XLF":  ["XLF", "financials ETF"],
-    "XLE":  ["XLE", "energy ETF"],
-    "XLK":  ["XLK", "technology ETF"],
+    "JPM": ["JPM", "JPMorgan", "JP Morgan"],
+    "BAC": ["BAC", "Bank of America"],
+    "GS": ["GS", "Goldman Sachs", "Goldman"],
+    "XOM": ["XOM", "ExxonMobil", "Exxon"],
+    "CVX": ["CVX", "Chevron"],
+    "AMD": ["AMD"],
+    "MU": ["MU", "Micron"],
+    "PFE": ["PFE", "Pfizer"],
+    "GLD": ["GLD", "Gold"],
+    "TLT": ["TLT", "Treasury"],
+    "XLF": ["XLF", "financials ETF"],
+    "XLE": ["XLE", "energy ETF"],
+    "XLK": ["XLK", "technology ETF"],
 }
 
 
@@ -254,7 +253,7 @@ def scrape_finviz(ticker: str) -> pd.DataFrame:
             if len(cells) < 2:
                 continue
             time_text = cells[0].get_text(strip=True)
-            headline  = cells[1].get_text(strip=True)
+            headline = cells[1].get_text(strip=True)
 
             try:
                 if len(time_text) > 8:
@@ -320,8 +319,8 @@ def scrape_yahoo_finance(ticker: str) -> pd.DataFrame:
 
 _RSS_INVESTING = {
     "investing_stocks": "https://www.investing.com/rss/news_25.rss",
-    "investing_economy":"https://www.investing.com/rss/news_14.rss",
-    "investing_etfs":   "https://www.investing.com/rss/news_95.rss",
+    "investing_economy": "https://www.investing.com/rss/news_14.rss",
+    "investing_etfs": "https://www.investing.com/rss/news_95.rss",
 }
 
 
@@ -382,8 +381,8 @@ def scrape_forex_factory(ticker: str = "SPY") -> pd.DataFrame:
 
         for event in events:
             country = event.get("country", "")
-            impact  = event.get("impact", "")
-            title   = event.get("title", "")
+            impact = event.get("impact", "")
+            title = event.get("title", "")
             date_str = event.get("date", "")
 
             if country != "USD" or impact not in _FF_MIN_IMPACT or not title:
@@ -480,14 +479,14 @@ def check_scraper_health(ticker: str) -> dict[str, int]:
     Prints a warning for any source that returns zero articles.
     """
     results = {
-        "rss_general":      len(scrape_rss_general(ticker)),
-        "yahoo_rss":        len(scrape_yahoo_rss(ticker)),
-        "google_news":      len(scrape_google_news(ticker)),
-        "seeking_alpha":    len(scrape_rss_seeking_alpha(ticker)),
-        "finviz":           len(scrape_finviz(ticker)),
-        "yahoo_news_page":  len(scrape_yahoo_finance(ticker)),
-        "investing_com":    len(scrape_investing_com(ticker)),
-        "forex_factory":    len(scrape_forex_factory(ticker)),
+        "rss_general": len(scrape_rss_general(ticker)),
+        "yahoo_rss": len(scrape_yahoo_rss(ticker)),
+        "google_news": len(scrape_google_news(ticker)),
+        "seeking_alpha": len(scrape_rss_seeking_alpha(ticker)),
+        "finviz": len(scrape_finviz(ticker)),
+        "yahoo_news_page": len(scrape_yahoo_finance(ticker)),
+        "investing_com": len(scrape_investing_com(ticker)),
+        "forex_factory": len(scrape_forex_factory(ticker)),
     }
     total = sum(results.values())
     print(f"\n[Scraper Health] {ticker}")
@@ -539,16 +538,16 @@ def scrape_wsb_sentiment(ticker: str, limit: int = 100, time_filter: str = "week
 
     for post in posts:
         d = post.get("data", {})
-        title   = d.get("title", "")
+        title = d.get("title", "")
         upvotes = max(int(d.get("score", 0)), 0)
         created = d.get("created_utc", 0)
-        date    = pd.Timestamp(created, unit="s").normalize()
+        date = pd.Timestamp(created, unit="s").normalize()
 
         if not title:
             continue
 
         compound = analyzer.polarity_scores(title)["compound"]
-        weight   = np.log1p(upvotes)
+        weight = np.log1p(upvotes)
         records.append({"date": date, "sentiment": compound, "weight": weight})
 
     if not records:

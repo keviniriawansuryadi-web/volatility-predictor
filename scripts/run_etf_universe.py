@@ -28,16 +28,15 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.stdout.reconfigure(encoding="utf-8")
 warnings.filterwarnings("ignore")
 
-import numpy as np
 import pandas as pd
 
 from main import run_ticker
-from config import TICKERS_ETF, DEFAULT_START, DEFAULT_END
+from config import TICKERS_ETF
 
 TODAY = date.today().isoformat()
 START = (date.today() - timedelta(days=5 * 365)).isoformat()
 PLOT_DIR = str(Path(__file__).parent.parent)
-OUT_DIR  = Path(__file__).parent.parent / "outputs" / "results"
+OUT_DIR = Path(__file__).parent.parent / "outputs" / "results"
 
 
 # Predicted model winners based on SPY findings:
@@ -51,13 +50,13 @@ OUT_DIR  = Path(__file__).parent.parent / "outputs" / "results"
 #   ^VIX — interesting — VIX's own vol (vol-of-vol)
 
 PREDICTIONS = {
-    "QQQ":  "StackingEnsemble",
-    "XLF":  "EGARCH",
-    "XLE":  "XGBoost",
-    "XLK":  "StackingEnsemble",
-    "XLV":  "unknown",
-    "GLD":  "unknown",
-    "TLT":  "unknown",
+    "QQQ": "StackingEnsemble",
+    "XLF": "EGARCH",
+    "XLE": "XGBoost",
+    "XLK": "StackingEnsemble",
+    "XLV": "unknown",
+    "GLD": "unknown",
+    "TLT": "unknown",
     "^VIX": "unknown",
 }
 
@@ -89,7 +88,7 @@ for ticker in TICKERS_ETF:
             "predicted": pred,
             "actual_winner": actual_winner,
             "best_qlike": round(float(best_row["QLIKE"]), 4),
-            "best_corr":  round(float(best_row["Corr"]),  4),
+            "best_corr": round(float(best_row["Corr"]), 4),
             "best_spike_acc": round(float(best_row["Spike_Acc"]), 4) if not pd.isna(best_row["Spike_Acc"]) else None,
             "prediction_correct": (pred == actual_winner) or pred == "unknown",
         })
@@ -119,4 +118,4 @@ if etf_rows:
         print(f"  {r['ticker']:>6}  {r['predicted']:>20}  {r['actual_winner']:>20}"
               f"  {r['best_qlike']:>7.4f}  {r['best_corr']:>7.4f}  {match}")
 
-print(f"\n  Section 4 COMPLETE.")
+print("\n  Section 4 COMPLETE.")

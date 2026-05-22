@@ -10,7 +10,6 @@ import warnings
 warnings.filterwarnings("ignore")
 
 from datetime import date, timedelta
-import numpy as np
 import pandas as pd
 from pathlib import Path
 
@@ -23,8 +22,8 @@ from src.har_model import har_rv_forecast
 from src.walk_forward import walk_forward_validate
 from config import DEFAULT_GARCH_TYPE
 
-TODAY   = date.today().isoformat()
-START   = (date.today() - timedelta(days=5 * 365)).isoformat()
+TODAY = date.today().isoformat()
+START = (date.today() - timedelta(days=5 * 365)).isoformat()
 HORIZON = 21
 TICKERS = ["MU", "NVDA", "AMD", "JPM", "BAC", "XOM", "AAPL", "MSFT"]
 
@@ -34,10 +33,10 @@ def _build(ticker):
     vix_df = load_vix_data(START, TODAY)
     if not vix_df.empty:
         df = df.join(vix_df, how="left")
-        df[["vix_level","vix_change"]] = df[["vix_level","vix_change"]].ffill()
-    df["sentiment"]     = fetch_sentiment(ticker, df.index)
+        df[["vix_level", "vix_change"]] = df[["vix_level", "vix_change"]].ffill()
+    df["sentiment"] = fetch_sentiment(ticker, df.index)
     df["wsb_sentiment"] = fetch_wsb_sentiment(ticker, df.index)
-    df["garch_vol"]     = garch_in_sample_vol(df["log_return"], model_type=DEFAULT_GARCH_TYPE)
+    df["garch_vol"] = garch_in_sample_vol(df["log_return"], model_type=DEFAULT_GARCH_TYPE)
     feat_df = build_features(df, forecast_horizon=HORIZON)
     return df, feat_df
 
@@ -70,20 +69,23 @@ def make_model_fns(ticker):
     def stack_fn(feat_df, df_raw, train_idx, test_idx):
         train_size = test_idx.start / len(feat_df)
         eg = rolling_garch_forecast(df_raw["log_return"], train_size, HORIZON, DEFAULT_GARCH_TYPE)
-        xg, _, _ = train_and_predict(feat_df, model_type="xgboost",            train_size=train_size)
-        xa, _, _ = train_and_predict(feat_df, model_type="xgboost_asymmetric",  train_size=train_size)
-        rf, _, _ = train_and_predict(feat_df, model_type="random_forest",       train_size=train_size)
-        vix_col  = df_raw["vix_level"] if "vix_level" in df_raw.columns else None
-        return train_stacking_ensemble(feat_df,
-               base_forecasts={DEFAULT_GARCH_TYPE: eg, "XGBoost": xg, "XGB-Asymmetric": xa, "RandomForest": rf},
-               train_size=train_size, vix_series=vix_col)
+        xg, _, _ = train_and_predict(feat_df, model_type="xgboost", train_size=train_size)
+        xa, _, _ = train_and_predict(feat_df, model_type="xgboost_asymmetric", train_size=train_size)
+        rf, _, _ = train_and_predict(feat_df, model_type="random_forest", train_size=train_size)
+        vix_col = df_raw["vix_level"] if "vix_level" in df_raw.columns else None
+        base_forecasts = {
+            DEFAULT_GARCH_TYPE: eg, "XGBoost": xg,
+            "XGB-Asymmetric": xa, "RandomForest": rf,
+        }
+        return train_stacking_ensemble(feat_df, base_forecasts=base_forecasts,
+                                       train_size=train_size, vix_series=vix_col)
 
     return {
-        "Persistence":      persist_fn,
+        "Persistence": persist_fn,
         DEFAULT_GARCH_TYPE: egarch_fn,
-        "HAR-RV":           har_fn,
-        "XGBoost":          xgb_fn,
-        "RandomForest":     rf_fn,
+        "HAR-RV": har_fn,
+        "XGBoost": xgb_fn,
+        "RandomForest": rf_fn,
         "StackingEnsemble": stack_fn,
     }
 
@@ -94,9 +96,9 @@ for ticker in TICKERS:
     print(f"\n{'='*55}\n  {ticker} — walk-forward CV (5 folds)\n{'='*55}")
     try:
         df, feat_df = _build(ticker)
-        model_fns   = make_model_fns(ticker)
+        model_fns = make_model_fns(ticker)
         detail = walk_forward_validate(feat_df, df, model_fns, n_splits=5)
-        summary = detail.groupby("model")["QLIKE"].agg(["mean","std"]).reset_index()
+        summary = detail.groupby("model")["QLIKE"].agg(["mean", "std"]).reset_index()
         summary["ticker"] = ticker
         all_summary.append(summary)
     except Exception as e:

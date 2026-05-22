@@ -31,10 +31,10 @@ import pandas as pd
 from main import run_ticker
 from config import TICKERS_OOS
 
-TODAY    = date.today().isoformat()
-START    = (date.today() - timedelta(days=5 * 365)).isoformat()
+TODAY = date.today().isoformat()
+START = (date.today() - timedelta(days=5 * 365)).isoformat()
 PLOT_DIR = str(Path(__file__).parent.parent)
-OUT_DIR  = Path(__file__).parent.parent / "outputs" / "results"
+OUT_DIR = Path(__file__).parent.parent / "outputs" / "results"
 
 # Predictions informed by the sector/ETF pattern:
 #   - TSLA: VIX-sensitive, large-cap, frequent jumps → like SPY/QQQ → StackingEnsemble
@@ -42,14 +42,14 @@ OUT_DIR  = Path(__file__).parent.parent / "outputs" / "results"
 #   - PFE:  Healthcare binary vol → unknown; StackingEnsemble shown to win on XLV
 PREDICTIONS = {
     "TSLA": "StackingEnsemble",
-    "GS":   "EGARCH",
-    "PFE":  "StackingEnsemble (via XLV finding)",
+    "GS": "EGARCH",
+    "PFE": "StackingEnsemble (via XLV finding)",
 }
 
 print(f"\n{'='*70}")
-print(f"  OUT-OF-SAMPLE TICKERS: TSLA, GS, PFE")
+print("  OUT-OF-SAMPLE TICKERS: TSLA, GS, PFE")
 print(f"  Period: {START} to {TODAY}")
-print(f"  NOTE: No retuning — models run as-is from original 10-ticker training")
+print("  NOTE: No retuning — models run as-is from original 10-ticker training")
 print(f"{'='*70}")
 
 rows = []
@@ -71,15 +71,15 @@ for ticker in TICKERS_OOS:
         best_row = metrics.sort_values("QLIKE").iloc[0]
         actual_winner = best_row.name
         rows.append({
-            "ticker":         ticker,
-            "predicted":      pred,
-            "actual_winner":  actual_winner,
-            "best_qlike":     round(float(best_row["QLIKE"]), 4),
-            "best_corr":      round(float(best_row["Corr"]),  4),
+            "ticker": ticker,
+            "predicted": pred,
+            "actual_winner": actual_winner,
+            "best_qlike": round(float(best_row["QLIKE"]), 4),
+            "best_corr": round(float(best_row["Corr"]), 4),
             "best_spike_acc": round(float(best_row["Spike_Acc"]), 4) if not pd.isna(best_row["Spike_Acc"]) else None,
-            "egarch_qlike":   round(float(metrics.loc["EGARCH", "QLIKE"]), 4) if "EGARCH" in metrics.index else None,
-            "stack_qlike":    round(float(metrics.loc["StackingEnsemble", "QLIKE"]), 4)
-                              if "StackingEnsemble" in metrics.index else None,
+            "egarch_qlike": round(float(metrics.loc["EGARCH", "QLIKE"]), 4) if "EGARCH" in metrics.index else None,
+            "stack_qlike": round(float(metrics.loc["StackingEnsemble", "QLIKE"]), 4)
+            if "StackingEnsemble" in metrics.index else None,
         })
     except Exception as exc:
         print(f"  [{ticker}] FAILED: {exc}")
@@ -108,14 +108,17 @@ if rows:
               f"  {r['best_qlike']:>7.4f}  {r['best_corr']:>7.4f}  {match}")
 
     # Pattern check: does sector pattern hold?
-    print(f"\n  Pattern check:")
+    print("\n  Pattern check:")
     for r in rows:
         if "error" in r:
             continue
         stk = r.get("stack_qlike")
         egr = r.get("egarch_qlike")
         if stk and egr:
-            winner_note = f"StackingEnsemble wins by {(egr - stk):.4f} QLIKE" if stk < egr else f"EGARCH wins by {(stk - egr):.4f} QLIKE"
+            if stk < egr:
+                winner_note = f"StackingEnsemble wins by {(egr - stk):.4f} QLIKE"
+            else:
+                winner_note = f"EGARCH wins by {(stk - egr):.4f} QLIKE"
             print(f"    {r['ticker']}: {winner_note}")
 
-print(f"\n  Section 5 COMPLETE.")
+print("\n  Section 5 COMPLETE.")

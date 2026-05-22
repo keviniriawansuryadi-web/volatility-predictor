@@ -14,9 +14,9 @@ _REGIME_THRESHOLDS = {"Low": 0.15, "Elevated": 0.25, "High": 0.35}
 def _assign_regime(vol: np.ndarray) -> np.ndarray:
     """Map annualised vol values to string regime labels."""
     labels = np.full(len(vol), "Extreme", dtype=object)
-    labels[vol < _REGIME_THRESHOLDS["High"]]     = "High"
+    labels[vol < _REGIME_THRESHOLDS["High"]] = "High"
     labels[vol < _REGIME_THRESHOLDS["Elevated"]] = "Elevated"
-    labels[vol < _REGIME_THRESHOLDS["Low"]]      = "Low"
+    labels[vol < _REGIME_THRESHOLDS["Low"]] = "Low"
     return labels
 
 
@@ -223,9 +223,9 @@ def train_stacking_ensemble(
     from sklearn.linear_model import Ridge
 
     split = int(len(feat_df) * train_size)
-    test_df    = feat_df.iloc[split:]
+    test_df = feat_df.iloc[split:]
     test_index = test_df.index
-    y_test     = test_df["target"].values
+    y_test = test_df["target"].values
 
     # Align base forecasts to the test index, drop all-NaN columns
     aligned: dict[str, np.ndarray] = {}
@@ -263,22 +263,20 @@ def train_stacking_ensemble(
         return pd.Series(np.nan, index=test_index, name="stacking_ensemble")
 
     X_train_meta = X_meta[:half]
-    X_eval_meta  = X_meta[half:]
+    X_eval_meta = X_meta[half:]
     y_train_meta = y_test[:half]
-    eval_index   = test_index[half:]
+    eval_index = test_index[half:]
 
     # Dynamic clip ceiling: 1.5× the max base-model prediction seen in meta-training
     dyn_ceil = min(clip_ceiling, float(X_train_meta.max()) * 1.5 + 0.05)
 
     # --- Fix 2: Ridge vs Isotonic — pick lower training MAE ---
     preds_ridge = np.full(len(X_eval_meta), np.nan)
-    preds_iso   = np.full(len(X_eval_meta), np.nan)
+    preds_iso = np.full(len(X_eval_meta), np.nan)
     ridge_train_mae = np.inf
-    iso_train_mae   = np.inf
+    iso_train_mae = np.inf
 
     try:
-        # Use only the first base-model column (median of base preds) for isotonic
-        base_col_idx = 0  # EGARCH column (first in aligned dict)
         ridge = Ridge(alpha=1.0, positive=True)
         ridge.fit(X_train_meta, y_train_meta)
         preds_ridge_train = ridge.predict(X_train_meta)
@@ -313,7 +311,7 @@ def train_stacking_ensemble(
     eval_regimes = _assign_regime(y_test[half:])
     for regime in ["Low", "Elevated", "High", "Extreme"]:
         regime_mask_train = _assign_regime(y_train_meta) == regime
-        regime_mask_eval  = eval_regimes == regime
+        regime_mask_eval = eval_regimes == regime
         n_regime = regime_mask_train.sum()
         if n_regime < 5 or regime_mask_eval.sum() == 0:
             continue

@@ -16,7 +16,6 @@ matplotlib.use("Agg")
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
 
 
 def test_volatility_spillover(
@@ -52,7 +51,6 @@ def test_volatility_spillover(
     from statsmodels.tsa.stattools import grangercausalitytests
 
     tickers = list(vol_dict.keys())
-    n = len(tickers)
     pval_matrix = pd.DataFrame(np.nan, index=tickers, columns=tickers)
 
     for src in tickers:
@@ -70,7 +68,7 @@ def test_volatility_spillover(
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")
                     results = grangercausalitytests(data[["target", "source"]], maxlag=max_lag,
-                                                   verbose=False)
+                                                    verbose=False)
                 # Minimum p-value across lags 1..max_lag (strongest signal)
                 min_p = min(
                     results[lag][0]["ssr_ftest"][1]

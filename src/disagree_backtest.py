@@ -9,8 +9,6 @@ Treats high EGARCH-ML disagreement as a directional trading signal:
 
 from __future__ import annotations
 
-import warnings
-import numpy as np
 import pandas as pd
 
 
@@ -56,20 +54,20 @@ def backtest_disagreement_signal(
     if len(common) < 30:
         return {"available": False, "reason": f"Only {len(common)} common observations — need >= 30."}
 
-    eg  = garch_preds.reindex(common)
-    ml  = ml_preds.reindex(common)
-    rv  = realized_vol.reindex(common)
+    eg = garch_preds.reindex(common)
+    ml = ml_preds.reindex(common)
+    rv = realized_vol.reindex(common)
 
-    denom        = (eg.abs() + ml.abs()) / 2 + 1e-8
+    denom = (eg.abs() + ml.abs()) / 2 + 1e-8
     disagreement = (eg - ml).abs() / denom
 
     threshold = float(disagreement.quantile(threshold_pct))
-    signal    = disagreement >= threshold
+    signal = disagreement >= threshold
 
     vol_median = float(rv.quantile(vol_spike_pct))
 
     rv_signal = rv[signal].dropna()
-    rv_quiet  = rv[~signal].dropna()
+    rv_quiet = rv[~signal].dropna()
 
     if len(rv_signal) < 5 or len(rv_quiet) < 5:
         return {
@@ -77,9 +75,9 @@ def backtest_disagreement_signal(
             "reason": f"Too few signal ({len(rv_signal)}) or quiet ({len(rv_quiet)}) days.",
         }
 
-    hit_rate  = float((rv_signal > vol_median).mean())
-    fpr       = 1.0 - hit_rate
-    vol_lift  = float(rv_signal.mean() / (rv_quiet.mean() + 1e-10))
+    hit_rate = float((rv_signal > vol_median).mean())
+    fpr = 1.0 - hit_rate
+    vol_lift = float(rv_signal.mean() / (rv_quiet.mean() + 1e-10))
 
     # Interpretation
     if hit_rate >= 0.65 and vol_lift >= 1.20:
@@ -90,19 +88,19 @@ def backtest_disagreement_signal(
         interp = "WEAK signal — disagreement has limited predictive power"
 
     return {
-        "available":           True,
-        "hit_rate":            hit_rate,
+        "available": True,
+        "hit_rate": hit_rate,
         "false_positive_rate": fpr,
-        "vol_lift":            vol_lift,
-        "signal_count":        int(signal.sum()),
-        "no_signal_count":     int((~signal).sum()),
-        "vol_median":          vol_median,
-        "mean_vol_signal":     float(rv_signal.mean()),
-        "mean_vol_quiet":      float(rv_quiet.mean()),
+        "vol_lift": vol_lift,
+        "signal_count": int(signal.sum()),
+        "no_signal_count": int((~signal).sum()),
+        "vol_median": vol_median,
+        "mean_vol_signal": float(rv_signal.mean()),
+        "mean_vol_quiet": float(rv_quiet.mean()),
         "disagreement_series": disagreement,
-        "threshold":           threshold,
-        "threshold_pct":       threshold_pct,
-        "interpretation":      interp,
+        "threshold": threshold,
+        "threshold_pct": threshold_pct,
+        "interpretation": interp,
     }
 
 
@@ -123,8 +121,8 @@ def compute_live_disagreement_percentile(
     """
     pct = float((disagreement_series < current_disagreement).mean() * 100)
     mean_d = float(disagreement_series.mean())
-    std_d  = float(disagreement_series.std())
-    z      = (current_disagreement - mean_d) / (std_d + 1e-10)
+    std_d = float(disagreement_series.std())
+    z = (current_disagreement - mean_d) / (std_d + 1e-10)
 
     flag = pct >= 80.0  # top-20% = high-disagreement signal
 
@@ -139,9 +137,9 @@ def compute_live_disagreement_percentile(
 
     return {
         "current_value": round(current_disagreement, 4),
-        "percentile":    round(pct, 1),
-        "z_score":       round(z, 2),
-        "flag":          flag,
+        "percentile": round(pct, 1),
+        "z_score": round(z, 2),
+        "flag": flag,
         "interpretation": text,
     }
 
@@ -159,7 +157,7 @@ def print_backtest_results(ticker: str, result: dict) -> None:
           f"(top {100 - result['threshold_pct']*100:.0f}% of disagreement days)")
     print(f"  Signal fires     : {result['signal_count']} days")
     print(f"  No-signal days   : {result['no_signal_count']} days")
-    print(f"")
+    print("")
     print(f"  Hit rate         : {result['hit_rate']:.1%}  "
           f"(signal days where next-day vol > median)")
     print(f"  False pos. rate  : {result['false_positive_rate']:.1%}")
@@ -167,6 +165,6 @@ def print_backtest_results(ticker: str, result: dict) -> None:
           f"(signal mean vol / quiet mean vol)")
     print(f"  Mean vol | signal: {result['mean_vol_signal']:.1%}")
     print(f"  Mean vol | quiet : {result['mean_vol_quiet']:.1%}")
-    print(f"")
+    print("")
     print(f"  Interpretation   : {result['interpretation']}")
     print(f"{'='*60}")

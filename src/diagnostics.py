@@ -13,7 +13,6 @@ Additional functions:
 
 from __future__ import annotations
 
-import warnings
 from pathlib import Path
 
 import numpy as np
@@ -26,9 +25,12 @@ DIAG_DIR = Path(__file__).parent.parent / "outputs" / "diagnostics"
 
 
 def _regime_label(vol: float) -> str:
-    if vol >= 0.35:  return "Extreme"
-    if vol >= 0.25:  return "High"
-    if vol >= 0.15:  return "Elevated"
+    if vol >= 0.35:
+        return "Extreme"
+    if vol >= 0.25:
+        return "High"
+    if vol >= 0.15:
+        return "Elevated"
     return "Low"
 
 
@@ -112,7 +114,7 @@ def diagnose_poor_performer(
     # Build markdown table without tabulate dependency
     cols = tbl.columns.tolist()
     header = "| " + " | ".join(cols) + " |"
-    sep    = "| " + " | ".join(["---"] * len(cols)) + " |"
+    sep = "| " + " | ".join(["---"] * len(cols)) + " |"
     lines.append(header)
     lines.append(sep)
     for _, row in tbl.iterrows():
@@ -131,14 +133,14 @@ def diagnose_poor_performer(
     for col in key_cols:
         if col in feat_df.columns:
             n_na = feat_df[col].isna().sum()
-            pct  = n_na / len(feat_df) * 100
+            pct = n_na / len(feat_df) * 100
             p(f"- `{col}`: {n_na} missing ({pct:.1f}%)")
         else:
             p(f"- `{col}`: **COLUMN ABSENT**")
 
     if "sentiment" in feat_df.columns:
         zero_sent = (feat_df["sentiment"] == 0.0).sum()
-        pct_zero  = zero_sent / len(feat_df) * 100
+        pct_zero = zero_sent / len(feat_df) * 100
         p(f"\n**Sentiment:** {zero_sent} zero-days ({pct_zero:.1f}%) — "
           f"{'POOR coverage, imputed from rolling median' if pct_zero > 80 else 'acceptable'}")
 
@@ -148,7 +150,7 @@ def diagnose_poor_performer(
     y_test = feat_df["target"].values[split:]
     regimes = [_regime_label(v) for v in y_test]
     for regime in ["Low", "Elevated", "High", "Extreme"]:
-        n   = regimes.count(regime)
+        n = regimes.count(regime)
         pct = n / len(regimes) * 100
         p(f"- {regime}: {n} days ({pct:.1f}%)")
 
@@ -159,8 +161,8 @@ def diagnose_poor_performer(
 
     # ── 4. Top-10 worst underestimations ──────────────────────────────────────
     h("4. Worst 10 Underestimation Errors (test set)")
-    test_df   = feat_df.iloc[split:].copy()
-    y_true_s  = test_df["target"]
+    test_df = feat_df.iloc[split:].copy()
+    y_true_s = test_df["target"]
 
     # Use the best model's predictions from results_df if available in feat_df;
     # otherwise proxy with EGARCH col (garch_vol shifted by forecast horizon)
@@ -175,11 +177,11 @@ def diagnose_poor_performer(
     p("| Rank | Date | Realized Vol | EGARCH Forecast | Error | Earnings Proxy |")
     p("|------|------|-------------|-----------------|-------|----------------|")
     for rank, idx in enumerate(worst_idx, 1):
-        date    = test_df.index[idx].strftime("%Y-%m-%d")
-        rv      = float(y_true_s.iloc[idx])
-        pred    = float(proxy_pred[idx])
-        err     = float(errors[idx])
-        month   = test_df.index[idx].month
+        date = test_df.index[idx].strftime("%Y-%m-%d")
+        rv = float(y_true_s.iloc[idx])
+        pred = float(proxy_pred[idx])
+        err = float(errors[idx])
+        month = test_df.index[idx].month
         earnings_flag = "YES" if month in [1, 4, 7, 10] else "no"
         p(f"| {rank} | {date} | {rv:.1%} | {pred:.1%} | {err:.1%} | {earnings_flag} |")
 
@@ -187,8 +189,8 @@ def diagnose_poor_performer(
     h("5. EGARCH Rolling Forecast Stability")
     if "garch_vol" in feat_df.columns:
         garch_vals = feat_df["garch_vol"].dropna().values
-        garch_cv   = float(np.std(garch_vals) / (np.mean(garch_vals) + 1e-8))
-        rv_cv      = float(np.std(y_test) / (np.mean(y_test) + 1e-8))
+        garch_cv = float(np.std(garch_vals) / (np.mean(garch_vals) + 1e-8))
+        rv_cv = float(np.std(y_test) / (np.mean(y_test) + 1e-8))
         p(f"- EGARCH in-sample vol CoV: {garch_cv:.3f}")
         p(f"- Realized vol CoV (test):  {rv_cv:.3f}")
         ratio = garch_cv / (rv_cv + 1e-8)
@@ -266,7 +268,7 @@ def test_vix_only_model(
     yt, yp = y_test[mask], preds[mask]
 
     rmse = float(np.sqrt(mean_squared_error(yt, yp)))
-    mae  = float(mean_absolute_error(yt, yp))
+    mae = float(mean_absolute_error(yt, yp))
 
     eps = 1e-8
     h = np.maximum(yp, eps) ** 2
@@ -276,8 +278,8 @@ def test_vix_only_model(
     corr = float(np.corrcoef(yt, yp)[0, 1]) if len(yt) > 1 else float("nan")
 
     spike_thresh = float(np.percentile(yt, 90))
-    spike_mask   = yt > spike_thresh
-    spike_acc    = float((yp[spike_mask] > spike_thresh).mean()) if spike_mask.sum() > 0 else float("nan")
+    spike_mask = yt > spike_thresh
+    spike_acc = float((yp[spike_mask] > spike_thresh).mean()) if spike_mask.sum() > 0 else float("nan")
 
     conclusion = (
         f"VIX-only linear regression: Corr={corr:.4f}, QLIKE={qlike:.4f}. "
@@ -300,7 +302,7 @@ def test_vix_only_model(
         )
 
     print(f"\n{'='*60}")
-    print(f"  VIX-ONLY BASELINE (linear regression, vix_level only)")
+    print("  VIX-ONLY BASELINE (linear regression, vix_level only)")
     print(f"{'='*60}")
     print(f"  Intercept : {model.intercept_:.6f}")
     print(f"  Coefficient: {model.coef_[0]:.6f}")
@@ -359,18 +361,18 @@ def decompose_spike_accuracy(
     Returns a dict with per-model decomposition and a summary.
     """
     split = int(len(feat_df) * train_size)
-    test_df   = feat_df.iloc[split:].copy()
-    y_test    = test_df["target"].values
+    test_df = feat_df.iloc[split:].copy()
+    y_test = test_df["target"].values
     spike_thr = float(np.percentile(y_test, spike_pct * 100))
     spike_mask = y_test > spike_thr
 
     # Feature 75th percentile thresholds on the full dataset (training + test)
-    vix_p75  = float(feat_df["vix_level"].quantile(0.75))   if "vix_level"   in feat_df.columns else None
-    jump_p75 = float(feat_df["jump_flag"].quantile(0.75))   if "jump_flag"   in feat_df.columns else None
+    vix_p75 = float(feat_df["vix_level"].quantile(0.75)) if "vix_level" in feat_df.columns else None
+    jump_p75 = float(feat_df["jump_flag"].quantile(0.75)) if "jump_flag" in feat_df.columns else None
     sent_p75 = float(feat_df["sentiment_3d"].quantile(0.75)) if "sentiment_3d" in feat_df.columns else None
 
-    test_vix  = test_df["vix_level"].values   if "vix_level"   in test_df.columns else None
-    test_jump = test_df["jump_flag"].values    if "jump_flag"   in test_df.columns else None
+    test_vix = test_df["vix_level"].values if "vix_level" in test_df.columns else None
+    test_jump = test_df["jump_flag"].values if "jump_flag" in test_df.columns else None
     test_sent = test_df["sentiment_3d"].values if "sentiment_3d" in test_df.columns else None
 
     results = {}
@@ -378,7 +380,7 @@ def decompose_spike_accuracy(
         preds = series.reindex(test_df.index).values
         hit_mask = spike_mask & (preds > spike_thr)  # correctly flagged spikes
         n_spikes = int(spike_mask.sum())
-        n_hits   = int(hit_mask.sum())
+        n_hits = int(hit_mask.sum())
         if n_spikes == 0:
             results[label] = {"n_spikes": 0, "n_hits": 0}
             continue
@@ -389,7 +391,7 @@ def decompose_spike_accuracy(
                 return None
             return float((feature_vals[hit_mask] > threshold).mean()) if n_hits > 0 else 0.0
 
-        vix_driven  = _pct_elevated(test_vix,  vix_p75)
+        vix_driven = _pct_elevated(test_vix, vix_p75)
         jump_driven = _pct_elevated(test_jump, jump_p75)
         sent_driven = _pct_elevated(test_sent, sent_p75)
 
@@ -397,7 +399,7 @@ def decompose_spike_accuracy(
             n_spikes=n_spikes,
             n_hits=n_hits,
             spike_acc=round(n_hits / n_spikes, 4),
-            vix_elevated_pct=round(vix_driven, 4)  if vix_driven  is not None else None,
+            vix_elevated_pct=round(vix_driven, 4) if vix_driven is not None else None,
             jump_elevated_pct=round(jump_driven, 4) if jump_driven is not None else None,
             sent_elevated_pct=round(sent_driven, 4) if sent_driven is not None else None,
         )
@@ -410,9 +412,12 @@ def decompose_spike_accuracy(
         if r["n_spikes"] == 0:
             continue
         print(f"\n  [{lbl}]  hits={r['n_hits']}/{r['n_spikes']}  spike_acc={r.get('spike_acc', 0):.1%}")
-        if r.get("vix_elevated_pct")  is not None: print(f"    (a) VIX above 75th pct on hit days  : {r['vix_elevated_pct']:.1%}")
-        if r.get("jump_elevated_pct") is not None: print(f"    (b) jump_flag above 75th pct on hits: {r['jump_elevated_pct']:.1%}")
-        if r.get("sent_elevated_pct") is not None: print(f"    (c) sentiment_3d above 75th pct     : {r['sent_elevated_pct']:.1%}")
+        if r.get("vix_elevated_pct") is not None:
+            print(f"    (a) VIX above 75th pct on hit days  : {r['vix_elevated_pct']:.1%}")
+        if r.get("jump_elevated_pct") is not None:
+            print(f"    (b) jump_flag above 75th pct on hits: {r['jump_elevated_pct']:.1%}")
+        if r.get("sent_elevated_pct") is not None:
+            print(f"    (c) sentiment_3d above 75th pct     : {r['sent_elevated_pct']:.1%}")
     print(f"{'='*65}")
 
     return dict(ticker=ticker, spike_threshold=spike_thr, decomposition=results)

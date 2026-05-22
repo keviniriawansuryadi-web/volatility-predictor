@@ -18,7 +18,6 @@ import warnings
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 import scipy.stats as stats
 import seaborn as sns
 import plotly.graph_objects as go
@@ -110,7 +109,7 @@ def plot_vol_distribution(df: pd.DataFrame, ticker: str = "MU") -> go.Figure:
 
     fig.update_layout(
         title_text=f"EDA1: {ticker} Realized Volatility Distribution "
-                   f"(Shapiro-Wilk p={p_sw:.4f})",
+        f"(Shapiro-Wilk p={p_sw:.4f})",
         showlegend=False, height=420,
     )
     fig.update_xaxes(title_text="Annualized Realized Vol", row=1, col=1)
@@ -171,15 +170,15 @@ def plot_rolling_correlation(
 
     colors = {
         "vader_compound": "#e74c3c",
-        "finbert":        "#3498db",
-        "textblob":       "#2ecc71",
-        "lm_score":       "#f39c12",
+        "finbert": "#3498db",
+        "textblob": "#2ecc71",
+        "lm_score": "#f39c12",
     }
     labels = {
         "vader_compound": "VADER",
-        "finbert":        "FinBERT",
-        "textblob":       "TextBlob",
-        "lm_score":       "LM Score",
+        "finbert": "FinBERT",
+        "textblob": "TextBlob",
+        "lm_score": "LM Score",
     }
 
     fig = go.Figure()
@@ -217,7 +216,7 @@ def plot_rolling_correlation(
     fig.add_hline(y=0, line_dash="dot", line_color="gray")
     fig.update_layout(
         title=f"EDA2: {window}-Day Rolling Correlation: Sentiment vs Realized Vol "
-              f"(shaded by VIX regime)",
+        f"(shaded by VIX regime)",
         xaxis_title="Date",
         yaxis_title="Pearson Correlation",
         legend_title="Sentiment Model",
@@ -388,7 +387,7 @@ def plot_10k_event_study(
     tercile_67 = lm_risk_scores.quantile(0.67)
     tercile_33 = lm_risk_scores.quantile(0.33)
     high_dates = lm_risk_scores[lm_risk_scores >= tercile_67].index
-    low_dates  = lm_risk_scores[lm_risk_scores <= tercile_33].index
+    low_dates = lm_risk_scores[lm_risk_scores <= tercile_33].index
 
     offsets = np.arange(-window, window + 1)
 
@@ -410,14 +409,14 @@ def plot_10k_event_study(
             np.nanmean(mat[rng.integers(0, len(mat), len(mat))], axis=0)
             for _ in range(n_boot)
         ])
-        lo = np.nanpercentile(boot, 2.5,  axis=0)
+        lo = np.nanpercentile(boot, 2.5, axis=0)
         hi = np.nanpercentile(boot, 97.5, axis=0)
         return means, lo, hi
 
     fig = go.Figure()
     for dates, label, color in [
         (high_dates, "High LM Risk", "#e74c3c"),
-        (low_dates,  "Low LM Risk",  "#3498db"),
+        (low_dates, "Low LM Risk", "#3498db"),
     ]:
         mat = _build_matrix(dates)
         if mat.shape[0] == 0:
@@ -590,10 +589,10 @@ def plot_feature_target_correlation(
     for col in cols:
         s = X[col].dropna()
         common = s.index.intersection(y.index)
-        rho_all,  _ = stats.spearmanr(s.reindex(common), y.reindex(common))
-        rho_h1,   _ = stats.spearmanr(
+        rho_all, _ = stats.spearmanr(s.reindex(common), y.reindex(common))
+        rho_h1, _ = stats.spearmanr(
             s.reindex(common[:half]), y.reindex(common[:half]))
-        rho_h2,   _ = stats.spearmanr(
+        rho_h2, _ = stats.spearmanr(
             s.reindex(common[half:]), y.reindex(common[half:]))
         rows.append(dict(
             feature=col, rho=rho_all,
@@ -717,7 +716,6 @@ def plot_sentiment_vol_joint(
     ), row=2, col=1)
 
     # Quadrant annotations
-    x_med, y_med = np.median(x), np.median(y)
     for qx, qy, text in [
         (x.min() * 0.7, y.max() * 0.9, "High |Sent| + High Vol"),
         (x.max() * 0.7, y.max() * 0.9, "Pos Sent + High Vol"),
@@ -737,7 +735,7 @@ def plot_sentiment_vol_joint(
         title=f"EDA8: Joint Distribution -- {sent_col} vs {vol_col}",
         height=520, showlegend=False,
     )
-    fig.update_xaxes(title_text=f"VADER Compound Score", row=2, col=1)
+    fig.update_xaxes(title_text="VADER Compound Score", row=2, col=1)
     fig.update_yaxes(title_text="Realized Vol (21d)", row=2, col=1)
 
     return fig
@@ -849,7 +847,7 @@ def plot_news_volume_vs_vol(
         sent[["news_count"]], how="inner"
     ).dropna()
 
-    vol_smooth   = combined["realized_vol_21d"].rolling(5).mean()
+    vol_smooth = combined["realized_vol_21d"].rolling(5).mean()
     count_smooth = combined["news_count"].rolling(5).mean()
 
     fig = make_subplots(specs=[[{"secondary_y": True}]])

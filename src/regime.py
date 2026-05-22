@@ -9,7 +9,6 @@ both for live signal enrichment and for academic reporting.
 from __future__ import annotations
 
 import warnings
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -17,13 +16,16 @@ import pandas as pd
 
 # Regime boundaries (annualised vol, consistent with src/ml_model.py)
 REGIME_BOUNDS = {"Low": 0.15, "Elevated": 0.25, "High": 0.35}
-REGIME_ORDER  = ["Low", "Elevated", "High", "Extreme"]
+REGIME_ORDER = ["Low", "Elevated", "High", "Extreme"]
 
 
 def _label(vol: float) -> str:
-    if vol >= REGIME_BOUNDS["High"]:     return "Extreme"
-    if vol >= REGIME_BOUNDS["Elevated"]: return "High"
-    if vol >= REGIME_BOUNDS["Low"]:      return "Elevated"
+    if vol >= REGIME_BOUNDS["High"]:
+        return "Extreme"
+    if vol >= REGIME_BOUNDS["Elevated"]:
+        return "High"
+    if vol >= REGIME_BOUNDS["Low"]:
+        return "Elevated"
     return "Low"
 
 
@@ -69,7 +71,7 @@ def analyze_regime_persistence(
         warnings.warn(f"[regime] '{vol_col}' not in df for {ticker} — returning empty dict.")
         return {}
 
-    vol  = df[vol_col].dropna()
+    vol = df[vol_col].dropna()
     regs = vol.map(_label)
 
     # ── 1. Run-length encoding ────────────────────────────────────────────────
@@ -89,7 +91,7 @@ def analyze_regime_persistence(
         avg_duration.setdefault(r, 0.0)
 
     # Current regime and run length
-    current_regime  = regs.iloc[-1]
+    current_regime = regs.iloc[-1]
     current_run_len = 0
     for i in range(len(regs) - 1, -1, -1):
         if regs.iloc[i] == current_regime:
@@ -126,20 +128,20 @@ def analyze_regime_persistence(
         expected_reversion = float("inf")
 
     result = {
-        "ticker":                    ticker,
-        "avg_duration":              avg_duration,
-        "current_regime":            current_regime,
-        "current_run_len":           current_run_len,
-        "transition_prob":           prob_mat,
-        "horizon_probs":             horizon_probs,
-        "expected_reversion_days":   expected_reversion,
+        "ticker": ticker,
+        "avg_duration": avg_duration,
+        "current_regime": current_regime,
+        "current_run_len": current_run_len,
+        "transition_prob": prob_mat,
+        "horizon_probs": horizon_probs,
+        "expected_reversion_days": expected_reversion,
         "historical_avg_extreme_dur": avg_duration.get("Extreme", 0.0),
     }
 
     # Print summary
     print(f"\n  [regime] {ticker} — current: {current_regime} "
           f"(run {current_run_len}d, expected reversion in {expected_reversion:.1f}d)")
-    print(f"  Avg regime durations: "
+    print("  Avg regime durations: "
           + ", ".join(f"{r}={avg_duration.get(r, 0):.1f}d" for r in REGIME_ORDER))
     for h in forecast_horizons:
         probs = horizon_probs[h]
@@ -162,15 +164,15 @@ def enrich_live_signal_with_regime(live_signal: dict, regime_result: dict) -> di
     if not regime_result:
         return live_signal
 
-    h5_probs  = regime_result["horizon_probs"].get(5, pd.Series())
+    h5_probs = regime_result["horizon_probs"].get(5, pd.Series())
     h20_probs = regime_result["horizon_probs"].get(20, pd.Series())
 
     live_signal["regime_persistence"] = {
-        "current_regime":              regime_result["current_regime"],
-        "current_run_days":            regime_result["current_run_len"],
-        "expected_reversion_days":     round(regime_result["expected_reversion_days"], 1),
-        "historical_avg_extreme_dur":  round(regime_result["historical_avg_extreme_dur"], 1),
-        "prob_still_extreme_at_t5":    round(float(h5_probs.get("Extreme", 0)), 3),
-        "prob_still_extreme_at_t20":   round(float(h20_probs.get("Extreme", 0)), 3),
+        "current_regime": regime_result["current_regime"],
+        "current_run_days": regime_result["current_run_len"],
+        "expected_reversion_days": round(regime_result["expected_reversion_days"], 1),
+        "historical_avg_extreme_dur": round(regime_result["historical_avg_extreme_dur"], 1),
+        "prob_still_extreme_at_t5": round(float(h5_probs.get("Extreme", 0)), 3),
+        "prob_still_extreme_at_t20": round(float(h20_probs.get("Extreme", 0)), 3),
     }
     return live_signal

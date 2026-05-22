@@ -253,20 +253,20 @@ def compute_market_sentiment_index(
     all_idx = all_idx.sort_values()
 
     weighted_sum = pd.Series(0.0, index=all_idx)
-    weight_sum   = pd.Series(0.0, index=all_idx)
+    weight_sum = pd.Series(0.0, index=all_idx)
 
     for t, df in available.items():
         wt = w.get(t, 0.0)
         sent = df["sentiment"].reindex(all_idx)  # NaN on days this ticker has no obs
         valid = sent.notna()
         weighted_sum[valid] += sent[valid] * wt
-        weight_sum[valid]   += wt
+        weight_sum[valid] += wt
 
     market_idx = (weighted_sum / weight_sum.replace(0, np.nan)).ffill()
     market_idx.name = "market_sentiment_index"
 
     n_tickers = len(available)
-    n_days    = market_idx.notna().sum()
+    n_days = market_idx.notna().sum()
     print(f"  [market_sentiment] Built index from {n_tickers} tickers over {n_days} days.")
 
     return market_idx
@@ -306,11 +306,11 @@ def test_market_sentiment_h1(
     if len(combined) < 10:
         return {"available": False, "conclusion": "Insufficient overlapping data."}
 
-    threshold  = combined["realized_vol_21d"].quantile(spike_pct)
+    threshold = combined["realized_vol_21d"].quantile(spike_pct)
     spike_mask = combined["realized_vol_21d"] >= threshold
 
-    spike_sent   = combined.loc[spike_mask,   "market_sentiment"].values
-    nospike_sent = combined.loc[~spike_mask,  "market_sentiment"].values
+    spike_sent = combined.loc[spike_mask, "market_sentiment"].values
+    nospike_sent = combined.loc[~spike_mask, "market_sentiment"].values
 
     if len(spike_sent) < 2 or len(nospike_sent) < 2:
         return {"available": False, "conclusion": "Too few spike days."}
@@ -335,7 +335,7 @@ def test_market_sentiment_h1(
     )
 
     print(f"\n{'='*60}")
-    print(f"  H1 (MARKET SENTIMENT INDEX) — SPY")
+    print("  H1 (MARKET SENTIMENT INDEX) — SPY")
     print(f"{'='*60}")
     print(f"  Spike days (n={n1}): mean market sentiment = {spike_sent.mean():.4f}")
     print(f"  Non-spike  (n={n2}): mean market sentiment = {nospike_sent.mean():.4f}")
@@ -385,10 +385,10 @@ def audit_sentiment_coverage(df: pd.DataFrame, ticker: str) -> pd.DataFrame:
     # NaN should not appear.
     out["sentiment_missing"] = df["sentiment"].isna() | (df["sentiment"] == 0.0)
 
-    n_total   = len(out)
+    n_total = len(out)
     n_missing = out["sentiment_missing"].sum()
-    n_real    = n_total - n_missing
-    coverage  = n_real / n_total * 100
+    n_real = n_total - n_missing
+    coverage = n_real / n_total * 100
 
     print(f"\n[Sentiment Audit] {ticker}")
     print(f"  Total trading days : {n_total}")

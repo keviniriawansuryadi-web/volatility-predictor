@@ -40,12 +40,12 @@ START = (date.today() - timedelta(days=5 * 365)).isoformat()
 WF_CSV = Path("outputs/results/walk_forward_results.csv")
 
 print(f"\n{'='*65}")
-print(f"  SECTION 11 — WALK-FORWARD VISUALIZATION")
+print("  SECTION 11 — WALK-FORWARD VISUALIZATION")
 print(f"{'='*65}")
 
 if not WF_CSV.exists():
     print(f"  Walk-forward CSV not found: {WF_CSV}")
-    print(f"  Run scripts/run_walk_forward.py first.")
+    print("  Run scripts/run_walk_forward.py first.")
     sys.exit(1)
 
 wf_df = pd.read_csv(WF_CSV)
@@ -58,10 +58,10 @@ def _load_feat(ticker):
     vix = load_vix_data(START, TODAY)
     if not vix.empty:
         df = df.join(vix, how="left")
-        df[["vix_level","vix_change"]] = df[["vix_level","vix_change"]].ffill()
-    df["sentiment"]     = fetch_sentiment(ticker, df.index)
+        df[["vix_level", "vix_change"]] = df[["vix_level", "vix_change"]].ffill()
+    df["sentiment"] = fetch_sentiment(ticker, df.index)
     df["wsb_sentiment"] = fetch_wsb_sentiment(ticker, df.index)
-    df["garch_vol"]     = garch_in_sample_vol(df["log_return"])
+    df["garch_vol"] = garch_in_sample_vol(df["log_return"])
     return build_features(df, forecast_horizon=5)
 
 
@@ -85,4 +85,4 @@ for ticker in ["SPY", "MU"]:
     )
     print(f"  [{ticker}] Chart: {path}")
 
-print(f"\n  Section 11 COMPLETE.")
+print("\n  Section 11 COMPLETE.")

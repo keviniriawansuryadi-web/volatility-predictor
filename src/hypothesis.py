@@ -107,7 +107,7 @@ def disagreement_vol_test(
     high_mask = disagreement >= cutoff
 
     high_vol = y_true[high_mask].dropna()
-    low_vol  = y_true[~high_mask].dropna()
+    low_vol = y_true[~high_mask].dropna()
 
     if len(high_vol) < 5 or len(low_vol) < 5:
         return {
@@ -124,18 +124,18 @@ def disagreement_vol_test(
     cohens_d = (high_vol.mean() - low_vol.mean()) / (pooled_std + 1e-10)
 
     return {
-        "available":            True,
+        "available": True,
         "threshold_percentile": threshold_pct,
-        "disagreement_cutoff":  float(cutoff),
-        "n_high":               int(high_mask.sum()),
-        "n_low":                int((~high_mask).sum()),
-        "high_mean_vol":        float(high_vol.mean()),
-        "low_mean_vol":         float(low_vol.mean()),
-        "mann_whitney_u":       float(u_stat),
-        "p_value":              float(p_value),
-        "cohens_d":             float(cohens_d),
-        "significant":          p_value < 0.05,
-        "disagreement_series":  disagreement,  # for adding as feature / signal
+        "disagreement_cutoff": float(cutoff),
+        "n_high": int(high_mask.sum()),
+        "n_low": int((~high_mask).sum()),
+        "high_mean_vol": float(high_vol.mean()),
+        "low_mean_vol": float(low_vol.mean()),
+        "mann_whitney_u": float(u_stat),
+        "p_value": float(p_value),
+        "cohens_d": float(cohens_d),
+        "significant": p_value < 0.05,
+        "disagreement_series": disagreement,  # for adding as feature / signal
     }
 
 
@@ -150,7 +150,7 @@ def print_disagreement_results(result: dict) -> None:
         print("=" * 60)
         return
 
-    print(f"  H2: High EGARCH-ML disagreement days have elevated realized vol")
+    print("  H2: High EGARCH-ML disagreement days have elevated realized vol")
     print(f"  Disagreement cutoff (top {result['threshold_percentile']:.0%}): "
           f"{result['disagreement_cutoff']:.4f}")
     print(f"  High-disagreement (n={result['n_high']}): "
@@ -167,11 +167,11 @@ def print_disagreement_results(result: dict) -> None:
             else "medium" if abs(result["cohens_d"]) > 0.5
             else "small"
         )
-        print(f"\n  REJECT H0 (p < 0.05). High EGARCH-ML disagreement days have")
+        print("\n  REJECT H0 (p < 0.05). High EGARCH-ML disagreement days have")
         print(f"  significantly higher realized vol (effect: {magnitude}).")
     else:
-        print(f"\n  FAIL TO REJECT H0 (p >= 0.05). No significant vol difference")
-        print(f"  between high- and low-disagreement days.")
+        print("\n  FAIL TO REJECT H0 (p >= 0.05). No significant vol difference")
+        print("  between high- and low-disagreement days.")
 
     print("=" * 60)
 
@@ -186,7 +186,7 @@ def print_hypothesis_results(result: dict) -> None:
         print("=" * 60)
         return
 
-    print(f"  H1: Spike days preceded by more negative sentiment")
+    print("  H1: Spike days preceded by more negative sentiment")
     print(f"  Spike threshold (90th pct): {result['spike_threshold']:.1%} annualized vol")
     print(f"  Spike days  (n={result['n_spike']}): "
           f"mean sentiment = {result['spike_mean_sentiment']:.4f}")
@@ -202,10 +202,10 @@ def print_hypothesis_results(result: dict) -> None:
             else "medium" if abs(result["cohens_d"]) > 0.5
             else "small"
         )
-        print(f"\n  REJECT H0 (p < 0.05). Spike days ARE preceded by significantly")
+        print("\n  REJECT H0 (p < 0.05). Spike days ARE preceded by significantly")
         print(f"  more negative sentiment (effect size: {magnitude}).")
     else:
-        print(f"\n  FAIL TO REJECT H0 (p >= 0.05). No statistically significant")
-        print(f"  difference in pre-spike sentiment detected.")
+        print("\n  FAIL TO REJECT H0 (p >= 0.05). No statistically significant")
+        print("  difference in pre-spike sentiment detected.")
 
     print("=" * 60)

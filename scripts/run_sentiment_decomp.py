@@ -19,7 +19,7 @@ df_dict = {}
 for t in TICKERS:
     try:
         df = load_stock_data(t, start, today, cache=True)
-        df["sentiment"]     = fetch_sentiment(t, df.index)
+        df["sentiment"] = fetch_sentiment(t, df.index)
         df["wsb_sentiment"] = fetch_wsb_sentiment(t, df.index)
         df_dict[t] = df
         print(f"  {t}: {len(df)} rows loaded")
@@ -32,7 +32,7 @@ result = decompose_sentiment(df_dict, list(df_dict.keys()))
 if result:
     print("\n  === SUMMARY ===")
     print(f"  Systematic-dominant tickers (>60%): {result['flag_systematic']}")
-    print(f"\n  Variance decomposition:")
+    print("\n  Variance decomposition:")
     for t in result["systematic_var_pct"].index:
         sp = result["systematic_var_pct"][t]
         ip = result["idio_var_pct"][t]

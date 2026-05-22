@@ -10,20 +10,19 @@ import warnings
 warnings.filterwarnings("ignore")
 
 from datetime import date, timedelta
-import numpy as np
 
 from src.data_loader import load_stock_data, load_vix_data
 from src.sentiment import fetch_sentiment, fetch_wsb_sentiment
-from src.features import build_features, FEATURE_COLS
+from src.features import build_features
 from src.garch_model import rolling_garch_forecast, garch_in_sample_vol
 from src.ml_model import train_and_predict
 from src.disagree_backtest import backtest_disagreement_signal, print_backtest_results
 from config import DEFAULT_TRAIN_SIZE, DEFAULT_GARCH_TYPE
 
-TICKERS     = ["MU", "JPM"]
-TRAIN_SIZE  = DEFAULT_TRAIN_SIZE
-HORIZON     = 21
-GARCH_TYPE  = DEFAULT_GARCH_TYPE
+TICKERS = ["MU", "JPM"]
+TRAIN_SIZE = DEFAULT_TRAIN_SIZE
+HORIZON = 21
+GARCH_TYPE = DEFAULT_GARCH_TYPE
 
 today = date.today().isoformat()
 start = (date.today() - timedelta(days=5 * 365)).isoformat()
@@ -39,9 +38,9 @@ for ticker in TICKERS:
         df = df.join(vix_df, how="left")
         df[["vix_level", "vix_change"]] = df[["vix_level", "vix_change"]].ffill()
 
-    df["sentiment"]     = fetch_sentiment(ticker, df.index)
+    df["sentiment"] = fetch_sentiment(ticker, df.index)
     df["wsb_sentiment"] = fetch_wsb_sentiment(ticker, df.index)
-    df["garch_vol"]     = garch_in_sample_vol(df["log_return"], model_type=GARCH_TYPE)
+    df["garch_vol"] = garch_in_sample_vol(df["log_return"], model_type=GARCH_TYPE)
 
     feat_df = build_features(df, forecast_horizon=HORIZON)
 
@@ -51,7 +50,7 @@ for ticker in TICKERS:
         forecast_horizon=HORIZON, model_type=GARCH_TYPE,
     )
 
-    print(f"  Training XGBoost...")
+    print("  Training XGBoost...")
     xgb_preds, _, _ = train_and_predict(feat_df, model_type="xgboost", train_size=TRAIN_SIZE)
 
     split = int(len(feat_df) * TRAIN_SIZE)

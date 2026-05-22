@@ -19,9 +19,12 @@ REGIME_BOUNDS = {"Low": 0.15, "Elevated": 0.25, "High": 0.35}
 
 
 def _regime_label(v: float) -> str:
-    if v >= 0.35: return "Extreme"
-    if v >= 0.25: return "High"
-    if v >= 0.15: return "Elevated"
+    if v >= 0.35:
+        return "Extreme"
+    if v >= 0.25:
+        return "High"
+    if v >= 0.15:
+        return "Elevated"
     return "Low"
 
 
@@ -74,8 +77,8 @@ def validate_model_performance(
       verdict (str — "VALID", "REGIME_LIMITED", "PERSISTENCE_DRIVEN", "CHECK_LEAKAGE")
     """
     split = int(len(feat_df) * train_size)
-    test_df  = feat_df.iloc[split:].copy()
-    y_test   = test_df["target"]
+    test_df = feat_df.iloc[split:].copy()
+    y_test = test_df["target"]
 
     feature_cols = [c for c in test_df.columns if c != "target"]
 
@@ -92,11 +95,11 @@ def validate_model_performance(
     # ── Check 2: Regime coverage ──────────────────────────────────────────────
     regime_labels = y_test.map(_regime_label)
     regime_counts = regime_labels.value_counts()
-    n_test        = len(y_test)
-    regime_dist   = {r: int(regime_counts.get(r, 0)) for r in ["Low","Elevated","High","Extreme"]}
-    regime_pct    = {r: round(v / n_test * 100, 1) for r, v in regime_dist.items()}
-    extreme_pct   = regime_pct["Extreme"]
-    regime_flag   = extreme_pct < 5.0
+    n_test = len(y_test)
+    regime_dist = {r: int(regime_counts.get(r, 0)) for r in ["Low", "Elevated", "High", "Extreme"]}
+    regime_pct = {r: round(v / n_test * 100, 1) for r, v in regime_dist.items()}
+    extreme_pct = regime_pct["Extreme"]
+    regime_flag = extreme_pct < 5.0
 
     # ── Check 3: Persistence baseline ────────────────────────────────────────
     # Naive: predict today's target = yesterday's target (1-day lag)
@@ -108,9 +111,9 @@ def validate_model_performance(
         rv_col = y_test.shift(1)
 
     persist_preds = rv_col.shift(1).reindex(y_test.index).dropna()
-    y_align       = y_test.reindex(persist_preds.index)
+    y_align = y_test.reindex(persist_preds.index)
 
-    persist_corr  = float(persist_preds.corr(y_align))
+    persist_corr = float(persist_preds.corr(y_align))
     # QLIKE for persistence: mean(log(sigma^2) + y^2/sigma^2) with sigma=persist
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -127,8 +130,8 @@ def validate_model_performance(
     common = stacking_preds.index.intersection(y_test.index)
     if len(common) >= 10:
         s_preds = stacking_preds.reindex(common)
-        y_s     = y_test.reindex(common)
-        stacking_corr  = float(s_preds.corr(y_s))
+        y_s = y_test.reindex(common)
+        stacking_corr = float(s_preds.corr(y_s))
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             stacking_qlike_vals = (
@@ -154,20 +157,20 @@ def validate_model_performance(
     verdict = " | ".join(verdicts) if verdicts else "VALID"
 
     result = {
-        "ticker":            ticker,
-        "n_test":            n_test,
-        "leakage_flags":     leakage_flags,
-        "regime_dist":       regime_dist,
-        "regime_pct":        regime_pct,
-        "extreme_pct":       extreme_pct,
-        "regime_flag":       regime_flag,
-        "persistence_corr":  round(persist_corr, 4),
+        "ticker": ticker,
+        "n_test": n_test,
+        "leakage_flags": leakage_flags,
+        "regime_dist": regime_dist,
+        "regime_pct": regime_pct,
+        "extreme_pct": extreme_pct,
+        "regime_flag": regime_flag,
+        "persistence_corr": round(persist_corr, 4),
         "persistence_qlike": round(persist_qlike, 4),
-        "stacking_corr":     round(stacking_corr, 4) if not np.isnan(stacking_corr) else None,
-        "stacking_qlike":    round(stacking_qlike, 4) if not np.isnan(stacking_qlike) else None,
+        "stacking_corr": round(stacking_corr, 4) if not np.isnan(stacking_corr) else None,
+        "stacking_qlike": round(stacking_qlike, 4) if not np.isnan(stacking_qlike) else None,
         "beats_persistence": beats_persistence,
-        "persistence_flag":  persistence_flag,
-        "verdict":           verdict,
+        "persistence_flag": persistence_flag,
+        "verdict": verdict,
     }
 
     _save_validation_report(result)
@@ -181,32 +184,32 @@ def _print_validation(r: dict) -> None:
     print(f"{'='*60}")
     print(f"  Test observations: {r['n_test']}")
 
-    print(f"\n  [Check 1] Leakage detection (corr > 0.95 with target on test set):")
+    print("\n  [Check 1] Leakage detection (corr > 0.95 with target on test set):")
     if r["leakage_flags"]:
         for feat, c in r["leakage_flags"]:
             print(f"    ⚠ {feat}: corr={c}  ← INVESTIGATE")
     else:
-        print(f"    ✓ No leakage detected")
+        print("    ✓ No leakage detected")
 
-    print(f"\n  [Check 2] Regime coverage (test set):")
+    print("\n  [Check 2] Regime coverage (test set):")
     for reg, pct in r["regime_pct"].items():
         flag = "  ← sparse" if reg == "Extreme" and pct < 5 else ""
         print(f"    {reg:10}: {r['regime_dist'][reg]:3d} obs ({pct:.1f}%){flag}")
     if r["regime_flag"]:
-        print(f"    ⚠ Extreme-regime coverage < 5% — REGIME_LIMITED")
+        print("    ⚠ Extreme-regime coverage < 5% — REGIME_LIMITED")
 
-    print(f"\n  [Check 3] Persistence baseline (y_t = y_{{t-1}}):")
+    print("\n  [Check 3] Persistence baseline (y_t = y_{{t-1}}):")
     print(f"    Persistence Corr : {r['persistence_corr']:.4f}")
     print(f"    Persistence QLIKE: {r['persistence_qlike']:.4f}")
     print(f"    StackingEnsemble Corr : {r['stacking_corr']}")
     print(f"    StackingEnsemble QLIKE: {r['stacking_qlike']}")
     beats = r.get("beats_persistence")
     if beats is True:
-        print(f"    ✓ StackingEnsemble BEATS persistence on QLIKE")
+        print("    ✓ StackingEnsemble BEATS persistence on QLIKE")
     elif beats is False:
-        print(f"    ⚠ StackingEnsemble does NOT beat persistence — PERSISTENCE_DRIVEN")
+        print("    ⚠ StackingEnsemble does NOT beat persistence — PERSISTENCE_DRIVEN")
     if r["persistence_flag"]:
-        print(f"    ⚠ Vol is sticky (persistence Corr > 0.85) — high Corr may be trivial")
+        print("    ⚠ Vol is sticky (persistence Corr > 0.85) — high Corr may be trivial")
 
     print(f"\n  VERDICT: {r['verdict']}")
     print(f"{'='*60}")

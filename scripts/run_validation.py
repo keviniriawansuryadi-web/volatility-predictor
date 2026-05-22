@@ -15,27 +15,23 @@ from src.ml_model import train_and_predict, train_stacking_ensemble
 from src.validation import validate_model_performance
 from config import DEFAULT_TRAIN_SIZE, DEFAULT_GARCH_TYPE
 
-TICKERS   = ["NVDA", "BAC", "AAPL"]
-TODAY     = date.today().isoformat()
-START     = (date.today() - __import__("datetime").timedelta(days=5 * 365)).isoformat()
+TICKERS = ["NVDA", "BAC", "AAPL"]
+TODAY = date.today().isoformat()
+START = (date.today() - timedelta(days=5 * 365)).isoformat()
 
 results = {}
 for ticker in TICKERS:
     print(f"\n{'='*50}\n  {ticker}\n{'='*50}")
-    df = load_stock_data(ticker, TODAY.__class__.__new__(str) or START, TODAY, cache=True)
-    # simpler: use date imports already available
-    from datetime import date, timedelta
-    start_str = (date.today() - timedelta(days=5*365)).isoformat()
-    df = load_stock_data(ticker, start_str, TODAY, cache=True)
+    df = load_stock_data(ticker, START, TODAY, cache=True)
 
-    vix_df = load_vix_data(start_str, TODAY)
+    vix_df = load_vix_data(START, TODAY)
     if not vix_df.empty:
         df = df.join(vix_df, how="left")
-        df[["vix_level","vix_change"]] = df[["vix_level","vix_change"]].ffill()
+        df[["vix_level", "vix_change"]] = df[["vix_level", "vix_change"]].ffill()
 
-    df["sentiment"]     = fetch_sentiment(ticker, df.index)
+    df["sentiment"] = fetch_sentiment(ticker, df.index)
     df["wsb_sentiment"] = fetch_wsb_sentiment(ticker, df.index)
-    df["garch_vol"]     = garch_in_sample_vol(df["log_return"], model_type=DEFAULT_GARCH_TYPE)
+    df["garch_vol"] = garch_in_sample_vol(df["log_return"], model_type=DEFAULT_GARCH_TYPE)
 
     feat_df = build_features(df, forecast_horizon=21)
 

@@ -44,9 +44,9 @@ def _load(ticker: str):
     if not vix_df.empty:
         df = df.join(vix_df, how="left")
         df[["vix_level", "vix_change"]] = df[["vix_level", "vix_change"]].ffill()
-    df["sentiment"]     = fetch_sentiment(ticker, df.index)
+    df["sentiment"] = fetch_sentiment(ticker, df.index)
     df["wsb_sentiment"] = fetch_wsb_sentiment(ticker, df.index)
-    df["garch_vol"]     = garch_in_sample_vol(df["log_return"])
+    df["garch_vol"] = garch_in_sample_vol(df["log_return"])
     feat_df = build_features(df, forecast_horizon=5)
     return df, feat_df
 
@@ -65,12 +65,12 @@ for ticker in ["SPY"]:
     # Build jump_flag series aligned to full dataframe
     jump_col = feat_df["jump_flag"] if "jump_flag" in feat_df.columns else pd.Series(0.0, index=feat_df.index)
 
-    print(f"\nRunning standard EGARCH...")
+    print("\nRunning standard EGARCH...")
     std_preds = rolling_garch_forecast(
         df["log_return"], train_size=DEFAULT_TRAIN_SIZE, forecast_horizon=5
     )
 
-    print(f"\nRunning Jump-EGARCH (exogenous jump_flag regressor)...")
+    print("\nRunning Jump-EGARCH (exogenous jump_flag regressor)...")
     jump_preds = fit_jump_egarch(
         returns=df["log_return"],
         jump_flags=jump_col.reindex(df.index).fillna(0),
@@ -82,7 +82,7 @@ for ticker in ["SPY"]:
         yp = preds_series.reindex(test_index).values
         return eval_metrics(y_test, yp, name, spike_thresh)
 
-    std_m  = _eval(std_preds, "EGARCH")
+    std_m = _eval(std_preds, "EGARCH")
     jump_m = _eval(jump_preds, "Jump-EGARCH")
 
     print(f"\n{'='*55}")
@@ -95,16 +95,16 @@ for ticker in ["SPY"]:
         print(f"  {m['model']:>15}  {m['QLIKE']:>7.4f}  {m['Corr']:>7.4f}  {sa:>10}")
 
     qlike_improvement = (std_m["QLIKE"] - jump_m["QLIKE"]) / (std_m["QLIKE"] + 1e-10)
-    corr_improvement  = jump_m["Corr"] - std_m["Corr"]
+    corr_improvement = jump_m["Corr"] - std_m["Corr"]
 
     print(f"\n  QLIKE improvement : {qlike_improvement:+.1%}")
     print(f"  Corr  improvement : {corr_improvement:+.4f}")
 
     if qlike_improvement > THRESHOLD_PCT:
         print(f"\n  ✓ Jump-EGARCH improves QLIKE by > 5% on {ticker}.")
-        print(f"    RECOMMENDATION: Add Jump-EGARCH to all tickers pipeline.")
+        print("    RECOMMENDATION: Add Jump-EGARCH to all tickers pipeline.")
     else:
         print(f"\n  Jump-EGARCH improvement below 5% threshold on {ticker}.")
-        print(f"    Standard EGARCH is sufficient for now.")
+        print("    Standard EGARCH is sufficient for now.")
 
-print(f"\n  Section 7 COMPLETE.")
+print("\n  Section 7 COMPLETE.")

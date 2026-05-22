@@ -16,7 +16,6 @@ import warnings
 
 import numpy as np
 import pandas as pd
-from scipy import stats
 
 
 def decompose_sentiment(
@@ -82,24 +81,21 @@ def decompose_sentiment(
     market_sent = panel.mean(axis=1)
 
     # ── Variance decomposition ────────────────────────────────────────────────
-    sys_var_pct  = {}
+    sys_var_pct = {}
     idio_var_pct = {}
-    idio_panels  = {}
+    idio_panels = {}
 
     for t in panel.columns:
         ticker_sent = panel[t]
-        total_var   = float(ticker_sent.var())
-        sys_var     = float(ticker_sent.cov(market_sent) ** 2 / (market_sent.var() + 1e-12)
-                            if market_sent.var() > 0 else 0.0)
         # R² = corr² between ticker sentiment and market sentiment
         corr = float(ticker_sent.corr(market_sent))
-        r2   = corr ** 2
-        sys_var_pct[t]  = r2 * 100
+        r2 = corr ** 2
+        sys_var_pct[t] = r2 * 100
         idio_var_pct[t] = (1 - r2) * 100
-        idio_panels[t]  = ticker_sent - market_sent
+        idio_panels[t] = ticker_sent - market_sent
 
     # ── Granger causality: systematic and idiosyncratic → ticker vol ──────────
-    granger_sys  = {}
+    granger_sys = {}
     granger_idio = {}
 
     for t in panel.columns:
@@ -111,11 +107,11 @@ def decompose_sentiment(
             continue
 
         for label, sent_series, result_dict in [
-            ("systematic", market_sent,  granger_sys),
-            ("idio",       idio_panels[t], granger_idio),
+            ("systematic", market_sent, granger_sys),
+            ("idio", idio_panels[t], granger_idio),
         ]:
             data = pd.DataFrame({
-                "vol":  vol.loc[common],
+                "vol": vol.loc[common],
                 "sent": sent_series.loc[common],
             }).dropna()
             if len(data) < 20:
@@ -131,7 +127,7 @@ def decompose_sentiment(
                 result_dict[t] = np.nan
 
     # ── Spike-day correlation ─────────────────────────────────────────────────
-    spike_corr_sys  = {}
+    spike_corr_sys = {}
     spike_corr_idio = {}
 
     for t in panel.columns:
@@ -148,7 +144,7 @@ def decompose_sentiment(
             continue
 
         vol_spike = vol.loc[spike_idx]
-        spike_corr_sys[t]  = float(vol_spike.corr(market_sent.reindex(spike_idx)))
+        spike_corr_sys[t] = float(vol_spike.corr(market_sent.reindex(spike_idx)))
         spike_corr_idio[t] = float(vol_spike.corr(idio_panels[t].reindex(spike_idx)))
 
     # ── Flag tickers where >60% of sentiment variance is systematic ───────────
@@ -161,12 +157,12 @@ def decompose_sentiment(
         )
 
     # ── Summary print ─────────────────────────────────────────────────────────
-    print(f"\n  [sentiment_decomp] Variance decomposition:")
+    print("\n  [sentiment_decomp] Variance decomposition:")
     print(f"  {'Ticker':<8} {'Systematic%':>12} {'Idiosyncratic%':>15} "
           f"{'Granger Sys p':>14} {'Granger Idio p':>15}")
     for t in panel.columns:
-        sp  = sys_var_pct.get(t, np.nan)
-        ip  = idio_var_pct.get(t, np.nan)
+        sp = sys_var_pct.get(t, np.nan)
+        ip = idio_var_pct.get(t, np.nan)
         gsp = granger_sys.get(t, np.nan)
         gip = granger_idio.get(t, np.nan)
         print(f"  {t:<8} {sp:>12.1f} {ip:>15.1f} "
@@ -174,12 +170,12 @@ def decompose_sentiment(
               f"{(f'{gip:.4f}' if not np.isnan(gip) else 'n/a'):>15}")
 
     return {
-        "systematic_var_pct":    pd.Series(sys_var_pct),
-        "idio_var_pct":          pd.Series(idio_var_pct),
-        "granger_systematic":    pd.Series(granger_sys),
-        "granger_idio":          pd.Series(granger_idio),
+        "systematic_var_pct": pd.Series(sys_var_pct),
+        "idio_var_pct": pd.Series(idio_var_pct),
+        "granger_systematic": pd.Series(granger_sys),
+        "granger_idio": pd.Series(granger_idio),
         "spike_corr_systematic": pd.Series(spike_corr_sys),
-        "spike_corr_idio":       pd.Series(spike_corr_idio),
-        "flag_systematic":       flag_systematic,
-        "market_sentiment":      market_sent,
+        "spike_corr_idio": pd.Series(spike_corr_idio),
+        "flag_systematic": flag_systematic,
+        "market_sentiment": market_sent,
     }

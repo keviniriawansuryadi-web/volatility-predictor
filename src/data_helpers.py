@@ -19,6 +19,7 @@ CACHE_DIR = Path(__file__).parent.parent / "data"
 # VIX
 # --------------------------------------------------------------------------- #
 
+
 def load_vix(start: str, end: str) -> pd.Series:
     """Return daily VIX closing levels aligned to calendar dates."""
     CACHE_DIR.mkdir(exist_ok=True)
@@ -101,9 +102,9 @@ def simulate_sentiment(df: pd.DataFrame, ticker: str, seed: int = 42) -> pd.Data
 
     sent = pd.DataFrame(index=df.index)
     sent["vader_compound"] = _score(0.25, 0.35)
-    sent["finbert"]        = _score(0.20, 0.25, ar=0.15)
-    sent["textblob"]       = _score(0.15, 0.45)
-    sent["lm_score"]       = _score(0.22, 0.30, ar=0.10)
+    sent["finbert"] = _score(0.20, 0.25, ar=0.15)
+    sent["textblob"] = _score(0.15, 0.45)
+    sent["lm_score"] = _score(0.22, 0.30, ar=0.10)
 
     # news_count: correlated weakly with |return| (high vol = more news)
     base_count = 3 + np.abs(factor) * 4 + rng.poisson(2, n)

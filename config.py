@@ -5,9 +5,9 @@ All scripts and notebooks should import from here rather than hard-coding values
 
 # Tickers covered by the batch pipeline, grouped by sector
 TICKERS = [
-    "MU",   "NVDA", "AMD",   # Semiconductors
-    "JPM",  "BAC",            # Financials
-    "XOM",  "CVX",            # Energy
+    "MU", "NVDA", "AMD",   # Semiconductors
+    "JPM", "BAC",            # Financials
+    "XOM", "CVX",            # Energy
     "AAPL", "MSFT",           # Tech (large-cap)
     "AMZN",                   # Consumer / Tech
 ]
@@ -20,47 +20,47 @@ TICKERS_ETF = ["QQQ", "XLF", "XLE", "XLK", "XLV", "GLD", "TLT", "^VIX"]
 TICKERS_OOS = ["TSLA", "GS", "PFE"]
 
 SECTOR_MAP = {
-    "MU":   "Semiconductors",
+    "MU": "Semiconductors",
     "NVDA": "Semiconductors",
-    "AMD":  "Semiconductors",
-    "JPM":  "Financials",
-    "BAC":  "Financials",
-    "XOM":  "Energy",
-    "CVX":  "Energy",
+    "AMD": "Semiconductors",
+    "JPM": "Financials",
+    "BAC": "Financials",
+    "XOM": "Energy",
+    "CVX": "Energy",
     "AAPL": "Tech",
     "MSFT": "Tech",
     "AMZN": "Consumer/Tech",
 }
 
 ETF_SECTOR_MAP = {
-    "QQQ":  "Tech-ETF",
-    "XLF":  "Financial-ETF",
-    "XLE":  "Energy-ETF",
-    "XLK":  "Tech-ETF",
-    "XLV":  "Healthcare-ETF",
-    "GLD":  "Commodity-ETF",
-    "TLT":  "Bond-ETF",
+    "QQQ": "Tech-ETF",
+    "XLF": "Financial-ETF",
+    "XLE": "Energy-ETF",
+    "XLK": "Tech-ETF",
+    "XLV": "Healthcare-ETF",
+    "GLD": "Commodity-ETF",
+    "TLT": "Bond-ETF",
     "^VIX": "VIX",
 }
 
 SECTOR_COLORS = {
     "Semiconductors": "#e74c3c",
-    "Financials":     "#3498db",
-    "Energy":         "#2ecc71",
-    "Tech":           "#9b59b6",
-    "Consumer/Tech":  "#f39c12",
+    "Financials": "#3498db",
+    "Energy": "#2ecc71",
+    "Tech": "#9b59b6",
+    "Consumer/Tech": "#f39c12",
 }
 
 # ── Sector-aware model routing ──────────────────────────────────────────────────
 # Maps each ticker to its sector key (lower-case, matches SECTOR_BEST_MODEL).
 TICKER_SECTORS = {
-    "MU":   "semiconductor",
+    "MU": "semiconductor",
     "NVDA": "semiconductor",
-    "AMD":  "semiconductor",
-    "JPM":  "financial",
-    "BAC":  "financial",
-    "XOM":  "energy",
-    "CVX":  "energy",
+    "AMD": "semiconductor",
+    "JPM": "financial",
+    "BAC": "financial",
+    "XOM": "energy",
+    "CVX": "energy",
     "AAPL": "tech",
     "MSFT": "tech",
     "AMZN": "tech",
@@ -74,9 +74,9 @@ TICKER_SECTORS = {
 #   Tech           : StackingEnsemble wins on AAPL, AMZN; EGARCH on MSFT — Stacking chosen
 SECTOR_BEST_MODEL = {
     "semiconductor": "EGARCH",
-    "financial":     "RandomForest",
-    "energy":        "XGBoost",
-    "tech":          "StackingEnsemble",
+    "financial": "RandomForest",
+    "energy": "XGBoost",
+    "tech": "StackingEnsemble",
 }
 
 # Per-ticker overrides when a ticker's best model diverges from its sector default.
@@ -86,7 +86,7 @@ SECTOR_BEST_MODEL = {
 #       EGARCH wins in the financial sector for JPM specifically.
 TICKER_MODEL_OVERRIDE = {
     "MSFT": "EGARCH",
-    "JPM":  "EGARCH",
+    "JPM": "EGARCH",
 }
 
 
@@ -129,8 +129,8 @@ def select_model_by_sector(ticker: str) -> str:
 
 # Default pipeline settings used by notebooks (fixed for reproducibility).
 # main.py CLI uses dynamic defaults: start=5 years ago, end=today.
-DEFAULT_START      = "2019-01-01"
-DEFAULT_END        = "2024-12-31"   # notebooks use this fixed window
-DEFAULT_HORIZON    = 5
+DEFAULT_START = "2019-01-01"
+DEFAULT_END = "2024-12-31"   # notebooks use this fixed window
+DEFAULT_HORIZON = 5
 DEFAULT_TRAIN_SIZE = 0.8
 DEFAULT_GARCH_TYPE = "EGARCH"

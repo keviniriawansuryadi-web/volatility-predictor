@@ -54,7 +54,7 @@ def compute_portfolio_vol_forecast(
     """
     # ── 1. Filter to tickers with both weight and forecast ───────────────────
     available = [t for t in tickers if t in forecasts and not np.isnan(forecasts.get(t, np.nan))]
-    missing   = [t for t in tickers if t not in available]
+    missing = [t for t in tickers if t not in available]
     if missing:
         warnings.warn(f"[portfolio] Skipping tickers with missing forecasts: {missing}")
     if len(available) < 2:
@@ -65,9 +65,9 @@ def compute_portfolio_vol_forecast(
         }
 
     # ── 2. Normalise weights ──────────────────────────────────────────────────
-    raw_w   = np.array([weights.get(t, 1.0 / len(available)) for t in available])
-    raw_w  /= raw_w.sum()
-    w_dict  = {t: float(raw_w[i]) for i, t in enumerate(available)}
+    raw_w = np.array([weights.get(t, 1.0 / len(available)) for t in available])
+    raw_w /= raw_w.sum()
+    w_dict = {t: float(raw_w[i]) for i, t in enumerate(available)}
 
     # ── 3. Build covariance matrix Σ from vol forecasts + correlations ───────
     n = len(available)
@@ -128,18 +128,18 @@ def compute_portfolio_vol_forecast(
 
 def _print_portfolio_summary(result: dict, spy_forecast: float | None) -> None:
     print(f"\n{'='*65}")
-    print(f"  PORTFOLIO VOL FORECAST")
+    print("  PORTFOLIO VOL FORECAST")
     print(f"{'='*65}")
     print(f"  Tickers: {', '.join(result['tickers_used'])}")
     if result["tickers_missing"]:
         print(f"  Skipped: {', '.join(result['tickers_missing'])} (no forecast)")
-    print(f"")
+    print("")
     print(f"  Portfolio vol        : {result['port_vol']:.2%}")
     print(f"  Avg individual vol   : {result['avg_individual_vol']:.2%}")
     print(f"  Diversification ratio: {result['diversification_ratio']:.3f}x")
     if spy_forecast:
         print(f"  SPY ensemble forecast: {spy_forecast:.2%}")
-    print(f"")
+    print("")
     if result.get("sanity_note"):
         prefix = "  ⚠" if not result["sanity_ok"] else "  ✓"
         print(f"{prefix} {result['sanity_note']}")

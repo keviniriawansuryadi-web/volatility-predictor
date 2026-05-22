@@ -37,29 +37,29 @@ from src.garch_model import rolling_garch_forecast, garch_in_sample_vol
 from src.ml_model import train_and_predict
 from config import TICKERS, DEFAULT_TRAIN_SIZE, DEFAULT_GARCH_TYPE
 
-TODAY  = date.today().isoformat()
-START  = (date.today() - timedelta(days=5 * 365)).isoformat()
-OUT    = Path("outputs/plots/portfolio_summary.png")
+TODAY = date.today().isoformat()
+START = (date.today() - timedelta(days=5 * 365)).isoformat()
+OUT = Path("outputs/plots/portfolio_summary.png")
 OUT.parent.mkdir(parents=True, exist_ok=True)
 
-MODELS  = ["EGARCH", "HAR-RV", "XGBoost", "XGB-Asymmetric", "RandomForest", "StackingEnsemble"]
+MODELS = ["EGARCH", "HAR-RV", "XGBoost", "XGB-Asymmetric", "RandomForest", "StackingEnsemble"]
 SECTORS = {
-    "MU":   "Semiconductor", "NVDA": "Semiconductor", "AMD":  "Semiconductor",
-    "JPM":  "Financial",     "BAC":  "Financial",
-    "XOM":  "Energy",        "CVX":  "Energy",
-    "AAPL": "Tech",          "MSFT": "Tech",          "AMZN": "Tech",
+    "MU": "Semiconductor", "NVDA": "Semiconductor", "AMD": "Semiconductor",
+    "JPM": "Financial", "BAC": "Financial",
+    "XOM": "Energy", "CVX": "Energy",
+    "AAPL": "Tech", "MSFT": "Tech", "AMZN": "Tech",
 }
 SECTOR_COLORS = {
     "Semiconductor": "#4e79a7",
-    "Financial":     "#f28e2b",
-    "Energy":        "#e15759",
-    "Tech":          "#59a14f",
+    "Financial": "#f28e2b",
+    "Energy": "#e15759",
+    "Tech": "#59a14f",
 }
 REGIME_COLORS = {
-    "Low":      "#2ca02c",
+    "Low": "#2ca02c",
     "Elevated": "#ffbf00",
-    "High":     "#ff7f0e",
-    "Extreme":  "#d62728",
+    "High": "#ff7f0e",
+    "Extreme": "#d62728",
 }
 
 # ── Load all model comparison CSVs ───────────────────────────────────────────
@@ -85,7 +85,7 @@ winner_pivot = all_df.pivot(index="ticker", columns="model", values="winner").re
 # Best non-EGARCH ML QLIKE per ticker
 ml_models = ["XGBoost", "XGB-Asymmetric", "RandomForest", "StackingEnsemble", "HAR-RV"]
 best_ml_qlike = all_df[all_df["model"].isin(ml_models)].groupby("ticker")["QLIKE"].min()
-egarch_qlike  = all_df[all_df["model"] == "EGARCH"].set_index("ticker")["QLIKE"]
+egarch_qlike = all_df[all_df["model"] == "EGARCH"].set_index("ticker")["QLIKE"]
 
 # ── Load current realized vol (Panel 3) ──────────────────────────────────────
 print("Loading cached price data for regime chart...")
@@ -99,12 +99,18 @@ for t in TICKERS:
         print(f"  {t}: FAILED — {e}")
         current_rv[t] = np.nan
 
+
 def _regime_label(v: float) -> str:
-    if np.isnan(v):  return "Low"
-    if v >= 0.35:    return "Extreme"
-    if v >= 0.25:    return "High"
-    if v >= 0.15:    return "Elevated"
+    if np.isnan(v):
+        return "Low"
+    if v >= 0.35:
+        return "Extreme"
+    if v >= 0.25:
+        return "High"
+    if v >= 0.15:
+        return "Elevated"
     return "Low"
+
 
 # ── Load MU disagreement history (Panel 4) ───────────────────────────────────
 print("Computing MU disagreement history...")
@@ -113,29 +119,29 @@ vix_df = load_vix_data(START, TODAY)
 if not vix_df.empty:
     mu_df = mu_df.join(vix_df, how="left")
     mu_df[["vix_level", "vix_change"]] = mu_df[["vix_level", "vix_change"]].ffill()
-mu_df["sentiment"]     = fetch_sentiment("MU", mu_df.index)
+mu_df["sentiment"] = fetch_sentiment("MU", mu_df.index)
 mu_df["wsb_sentiment"] = fetch_wsb_sentiment("MU", mu_df.index)
-mu_df["garch_vol"]     = garch_in_sample_vol(mu_df["log_return"], model_type=DEFAULT_GARCH_TYPE)
+mu_df["garch_vol"] = garch_in_sample_vol(mu_df["log_return"], model_type=DEFAULT_GARCH_TYPE)
 
-mu_feat   = build_features(mu_df, forecast_horizon=21)
-garch_mu  = rolling_garch_forecast(mu_df["log_return"], DEFAULT_TRAIN_SIZE, 21, DEFAULT_GARCH_TYPE)
+mu_feat = build_features(mu_df, forecast_horizon=21)
+garch_mu = rolling_garch_forecast(mu_df["log_return"], DEFAULT_TRAIN_SIZE, 21, DEFAULT_GARCH_TYPE)
 xgb_mu, _, _ = train_and_predict(mu_feat, model_type="xgboost", train_size=DEFAULT_TRAIN_SIZE)
 
-split    = int(len(mu_feat) * DEFAULT_TRAIN_SIZE)
-rv_mu    = mu_feat["target"].iloc[split:]
+split = int(len(mu_feat) * DEFAULT_TRAIN_SIZE)
+rv_mu = mu_feat["target"].iloc[split:]
 eg_common = garch_mu.index.intersection(xgb_mu.index).intersection(rv_mu.index)
 eg = garch_mu.reindex(eg_common)
 ml = xgb_mu.reindex(eg_common)
 denom = (eg.abs() + ml.abs()) / 2 + 1e-8
 disagree_series = (eg - ml).abs() / denom
-rv_series       = rv_mu.reindex(eg_common)
-thresh80        = float(disagree_series.quantile(0.80))
+rv_series = rv_mu.reindex(eg_common)
+thresh80 = float(disagree_series.quantile(0.80))
 
 print("Rendering 2×2 figure...")
 
 # ── Figure layout ─────────────────────────────────────────────────────────────
 fig = plt.figure(figsize=(20, 14))
-gs  = gridspec.GridSpec(2, 2, figure=fig, hspace=0.38, wspace=0.30)
+gs = gridspec.GridSpec(2, 2, figure=fig, hspace=0.38, wspace=0.30)
 ax1 = fig.add_subplot(gs[0, 0])
 ax2 = fig.add_subplot(gs[0, 1])
 ax3 = fig.add_subplot(gs[1, 0])
@@ -143,8 +149,8 @@ ax4 = fig.add_subplot(gs[1, 1])
 
 # ── Panel 1: QLIKE heatmap ────────────────────────────────────────────────────
 qdata = qlike_pivot.values.astype(float)
-vmax  = float(np.nanpercentile(qdata, 95))
-im1   = ax1.imshow(qdata, cmap="RdYlGn_r", aspect="auto", vmin=0, vmax=vmax)
+vmax = float(np.nanpercentile(qdata, 95))
+im1 = ax1.imshow(qdata, cmap="RdYlGn_r", aspect="auto", vmin=0, vmax=vmax)
 ax1.set_xticks(range(len(MODELS)))
 ax1.set_yticks(range(len(TICKERS)))
 ax1.set_xticklabels([m.replace("-", "-\n") for m in MODELS], fontsize=8, rotation=0)
@@ -172,10 +178,10 @@ plt.colorbar(im1, ax=ax1, label="QLIKE", fraction=0.035, pad=0.02)
 
 # ── Panel 2: EGARCH vs best-ML QLIKE scatter ─────────────────────────────────
 for t in TICKERS:
-    eg_q  = float(egarch_qlike.get(t, np.nan))
-    ml_q  = float(best_ml_qlike.get(t, np.nan))
-    sect  = SECTORS.get(t, "Other")
-    col   = SECTOR_COLORS.get(sect, "#999")
+    eg_q = float(egarch_qlike.get(t, np.nan))
+    ml_q = float(best_ml_qlike.get(t, np.nan))
+    sect = SECTORS.get(t, "Other")
+    col = SECTOR_COLORS.get(sect, "#999")
     ax2.scatter(eg_q, ml_q, color=col, s=120, zorder=3)
     ax2.annotate(t, (eg_q, ml_q), textcoords="offset points",
                  xytext=(6, 4), fontsize=8)
@@ -198,8 +204,8 @@ legend_patches = [
 ax2.legend(handles=legend_patches, fontsize=8, loc="upper left")
 
 # ── Panel 3: Regime bar chart ─────────────────────────────────────────────────
-rv_vals   = [current_rv.get(t, np.nan) for t in TICKERS]
-bar_cols  = [REGIME_COLORS[_regime_label(v)] for v in rv_vals]
+rv_vals = [current_rv.get(t, np.nan) for t in TICKERS]
+bar_cols = [REGIME_COLORS[_regime_label(v)] for v in rv_vals]
 bars = ax3.bar(TICKERS, rv_vals, color=bar_cols, edgecolor="white", linewidth=0.5)
 ax3.set_ylabel("Realized Vol (21d, annualised)", fontsize=10)
 ax3.set_title("Current Vol Regime by Ticker\n(as of latest trading day)", fontsize=11)

@@ -60,15 +60,7 @@ def walk_forward_validate(
     records = []
 
     for k, cut in enumerate(cutoffs):
-        train_start = 0
-        train_end   = int(n * (min_train_frac + (k - 0) * step)) if k > 0 else int(n * min_train_frac)
-        if k == 0:
-            train_end = int(n * min_train_frac)
-        else:
-            train_end = int(n * (min_train_frac + (k) * step))
-        test_end = cut if k < n_splits - 1 else n
-
-        # Expanding window: train on [0, train_end), test on [train_end, test_end)
+        # Expanding window: train on [0, test_start), test on [test_start, test_end_k)
         train_end_k = int(n * (min_train_frac + k * step)) if k < n_splits else n
         if k == 0:
             train_end_k = int(n * min_train_frac)
@@ -77,13 +69,11 @@ def walk_forward_validate(
         test_end_k = int(n * (min_train_frac + (k + 1) * step)) if k < n_splits - 1 else n
 
         train_idx = slice(0, test_start)
-        test_idx  = slice(test_start, test_end_k)
+        test_idx = slice(test_start, test_end_k)
 
         y_test = feat_df["target"].iloc[test_idx]
         if len(y_test) < 5:
             continue
-
-        spike_thresh = float(y_test.quantile(0.90))
 
         for label, fn in model_fns.items():
             try:
@@ -113,7 +103,7 @@ def walk_forward_validate(
     print("\n  Walk-forward CV — mean ± std QLIKE across folds:")
     print(f"  {'Model':<22} {'Mean QLIKE':>12} {'Std QLIKE':>12} {'CV Stable?':>12}")
     for model, grp in detail_df.groupby("model", sort=False):
-        mu  = grp["QLIKE"].mean()
+        mu = grp["QLIKE"].mean()
         std = grp["QLIKE"].std()
         stable = "YES" if std < mu else "⚠ HIGH STD"
         print(f"  {model:<22} {mu:>12.4f} {std:>12.4f} {stable:>12}")
@@ -154,13 +144,13 @@ def plot_walk_forward_results(
         return ""
 
     colors = {
-        "EGARCH":          "#e74c3c",
-        "HAR-RV":          "#e67e22",
-        "XGBoost":         "#3498db",
-        "XGB-Asymmetric":  "#2980b9",
-        "RandomForest":    "#27ae60",
-        "StackingEnsemble":"#8e44ad",
-        "Persistence":     "#95a5a6",
+        "EGARCH": "#e74c3c",
+        "HAR-RV": "#e67e22",
+        "XGBoost": "#3498db",
+        "XGB-Asymmetric": "#2980b9",
+        "RandomForest": "#27ae60",
+        "StackingEnsemble": "#8e44ad",
+        "Persistence": "#95a5a6",
     }
 
     out_dir = Path(__file__).parent.parent / "outputs" / "plots"
@@ -170,9 +160,9 @@ def plot_walk_forward_results(
 
     # ── Per-fold format ───────────────────────────────────────────────────────
     if "fold" in wf_results.columns and "QLIKE" in wf_results.columns:
-        models  = wf_results["model"].unique().tolist()
+        models = wf_results["model"].unique().tolist()
         n_folds = int(wf_results["fold"].max())
-        folds   = list(range(1, n_folds + 1))
+        folds = list(range(1, n_folds + 1))
 
         fold_stressed = {}
         if feat_df is not None:
@@ -201,7 +191,7 @@ def plot_walk_forward_results(
         ax.set_xticklabels([f"Fold {f}" for f in folds])
         ax.set_xlabel("Walk-Forward Fold")
 
-        calm_patch    = mpatches.Patch(facecolor="#d5f5e3", alpha=0.7, label="Calm (RV < 25%)")
+        calm_patch = mpatches.Patch(facecolor="#d5f5e3", alpha=0.7, label="Calm (RV < 25%)")
         stressed_patch = mpatches.Patch(facecolor="#fadbd8", alpha=0.7, label="Stressed (RV ≥ 25%)")
         handles, labels = ax.get_legend_handles_labels()
         ax.legend(handles=handles + [calm_patch, stressed_patch],
@@ -210,15 +200,15 @@ def plot_walk_forward_results(
 
     # ── Summary format (mean/std) ─────────────────────────────────────────────
     elif "mean" in wf_results.columns:
-        df_t   = wf_results.sort_values("mean")
+        df_t = wf_results.sort_values("mean")
         models = df_t["model"].tolist()
-        means  = df_t["mean"].values
-        stds   = df_t["std"].fillna(0).values
+        means = df_t["mean"].values
+        stds = df_t["std"].fillna(0).values
         bar_colors = [colors.get(m, "#7f8c8d") for m in models]
 
         fig, ax = plt.subplots(figsize=(10, 6))
         x = range(len(models))
-        bars = ax.bar(x, means, color=bar_colors, alpha=0.75, width=0.6)
+        ax.bar(x, means, color=bar_colors, alpha=0.75, width=0.6)
         ax.errorbar(x, means, yerr=stds, fmt="none", color="black",
                     capsize=4, linewidth=1.5)
 

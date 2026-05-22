@@ -14,7 +14,6 @@ import warnings
 warnings.filterwarnings("ignore")
 
 from datetime import date, timedelta
-import pandas as pd
 from pathlib import Path
 
 from src.data_loader import load_stock_data, load_vix_data
@@ -26,8 +25,8 @@ from src.har_model import har_rv_forecast
 from src.regime_perf import regime_conditional_performance
 from config import DEFAULT_TRAIN_SIZE, DEFAULT_GARCH_TYPE
 
-TODAY   = date.today().isoformat()
-START   = (date.today() - timedelta(days=5 * 365)).isoformat()
+TODAY = date.today().isoformat()
+START = (date.today() - timedelta(days=5 * 365)).isoformat()
 HORIZON = 21
 TICKERS = ["AMD", "MU"]
 
@@ -42,17 +41,17 @@ for ticker in TICKERS:
         df = df.join(vix_df, how="left")
         df[["vix_level", "vix_change"]] = df[["vix_level", "vix_change"]].ffill()
 
-    df["sentiment"]     = fetch_sentiment(ticker, df.index)
+    df["sentiment"] = fetch_sentiment(ticker, df.index)
     df["wsb_sentiment"] = fetch_wsb_sentiment(ticker, df.index)
-    df["garch_vol"]     = garch_in_sample_vol(df["log_return"], model_type=DEFAULT_GARCH_TYPE)
+    df["garch_vol"] = garch_in_sample_vol(df["log_return"], model_type=DEFAULT_GARCH_TYPE)
 
     feat_df = build_features(df, forecast_horizon=HORIZON)
 
-    garch_preds          = rolling_garch_forecast(df["log_return"], DEFAULT_TRAIN_SIZE, HORIZON, DEFAULT_GARCH_TYPE)
-    har_preds            = har_rv_forecast(df["realized_vol_21d"], train_size=DEFAULT_TRAIN_SIZE, forecast_horizon=HORIZON)
-    xgb_preds,  _, _     = train_and_predict(feat_df, model_type="xgboost",            train_size=DEFAULT_TRAIN_SIZE)
-    xgb_asym,   _, _     = train_and_predict(feat_df, model_type="xgboost_asymmetric", train_size=DEFAULT_TRAIN_SIZE)
-    rf_preds,   _, _     = train_and_predict(feat_df, model_type="random_forest",       train_size=DEFAULT_TRAIN_SIZE)
+    garch_preds = rolling_garch_forecast(df["log_return"], DEFAULT_TRAIN_SIZE, HORIZON, DEFAULT_GARCH_TYPE)
+    har_preds = har_rv_forecast(df["realized_vol_21d"], train_size=DEFAULT_TRAIN_SIZE, forecast_horizon=HORIZON)
+    xgb_preds, _, _ = train_and_predict(feat_df, model_type="xgboost", train_size=DEFAULT_TRAIN_SIZE)
+    xgb_asym, _, _ = train_and_predict(feat_df, model_type="xgboost_asymmetric", train_size=DEFAULT_TRAIN_SIZE)
+    rf_preds, _, _ = train_and_predict(feat_df, model_type="random_forest", train_size=DEFAULT_TRAIN_SIZE)
 
     vix_col = df["vix_level"] if "vix_level" in df.columns else None
     stack_preds = train_stacking_ensemble(
@@ -63,15 +62,15 @@ for ticker in TICKERS:
     )
 
     split = int(len(feat_df) * DEFAULT_TRAIN_SIZE)
-    rv    = feat_df["realized_vol_21d"] if "realized_vol_21d" in feat_df.columns else feat_df["target"]
+    rv = feat_df["realized_vol_21d"] if "realized_vol_21d" in feat_df.columns else feat_df["target"]
     persist_preds = rv.shift(1).iloc[split:]
 
     forecasts = {
-        "Persistence":      persist_preds,
+        "Persistence": persist_preds,
         DEFAULT_GARCH_TYPE: garch_preds,
-        "HAR-RV":           har_preds,
-        "XGBoost":          xgb_preds,
-        "RandomForest":     rf_preds,
+        "HAR-RV": har_preds,
+        "XGBoost": xgb_preds,
+        "RandomForest": rf_preds,
         "StackingEnsemble": stack_preds,
     }
 

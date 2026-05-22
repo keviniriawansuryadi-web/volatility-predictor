@@ -14,8 +14,8 @@ start = (date.today() - timedelta(days=5 * 365)).isoformat()
 
 sector_groups = {
     "Semiconductors": ["MU", "NVDA", "AMD"],
-    "Financials":     ["JPM", "BAC"],
-    "Energy":         ["XOM", "CVX"],
+    "Financials": ["JPM", "BAC"],
+    "Energy": ["XOM", "CVX"],
 }
 
 print("Loading price data for spillover analysis...")
