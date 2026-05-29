@@ -109,3 +109,14 @@ def test_variance_risk_premium_degraded(price_df):
     no_vix = price_df.drop(columns=["vix_level"])
     r = H.test_variance_risk_premium(no_vix)
     assert r["available"] is False
+
+
+def test_earnings_vol_premium_contract(price_df, earnings_dates):
+    r = H.test_earnings_vol_premium(price_df, earnings_dates, n_permutations=500)
+    _assert_contract(r)
+    assert r["hypothesis"] == "earnings_vol_premium"
+
+
+def test_earnings_vol_premium_degraded(price_df):
+    r = H.test_earnings_vol_premium(price_df, pd.DatetimeIndex([]), n_permutations=500)
+    assert r["available"] is False

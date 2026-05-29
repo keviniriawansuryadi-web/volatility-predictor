@@ -185,3 +185,42 @@ def test_variance_risk_premium(df: pd.DataFrame, ticker: str = "SPY",
                 current_state=state, significant=bool(p < 0.05),
                 neg_mean_fwd_vol=neg_mean, pos_mean_fwd_vol=pos_mean,
                 n_negative_vrp=int(len(neg)))
+
+
+def test_earnings_vol_premium(df: pd.DataFrame, earnings_dates,
+                              vol_col: str = "realized_vol_21d", window: int = 2,
+                              n_permutations: int = 5000, seed: int = 42) -> dict:
+    """Realized vol is higher in the +/-``window`` days around earnings than on
+    other days. Permutation test (label shuffling) on the difference in means —
+    appropriate because earnings windows are rare events.
+    """
+    title = "Earnings-week vol premium (permutation)"
+    trading_days = df.index
+    mask = pd.Series(False, index=trading_days)
+    for ed in pd.DatetimeIndex(earnings_dates):
+        pos = trading_days.searchsorted(ed)
+        lo = max(0, pos - window)
+        hi = min(len(trading_days), pos + window + 1)
+        mask.iloc[lo:hi] = True
+
+    data = df[[vol_col]].copy()
+    data["ew"] = mask.values
+    ew = data.loc[data["ew"], vol_col].dropna().values
+    non = data.loc[~data["ew"], vol_col].dropna().values
+    if len(ew) < 3 or len(non) < 3:
+        return _unavailable("earnings_vol_premium", title,
+                            f"Too few observations (earnings={len(ew)}, other={len(non)}).")
+
+    obs = float(ew.mean() - non.mean())
+    rng = np.random.default_rng(seed)
+    allv = np.concatenate([ew, non])
+    n_ew = len(ew)
+    perm = np.array([rng.permutation(allv)[:n_ew].mean()
+                     - rng.permutation(allv)[n_ew:].mean()
+                     for _ in range(n_permutations)])
+    p = float((perm >= obs).mean())
+    conclusion = (f"Earnings-window mean vol={ew.mean():.4f} vs other={non.mean():.4f} "
+                  f"(diff={obs:+.4f}); permutation p={p:.4f} ({_verdict(p)}).")
+    return dict(hypothesis="earnings_vol_premium", title=title, statistic=obs,
+                p_value=p, effect=obs, n=int(len(ew)), conclusion=conclusion,
+                available=True)
