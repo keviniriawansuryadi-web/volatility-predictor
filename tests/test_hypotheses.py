@@ -136,3 +136,16 @@ def test_regime_dependent_leverage_degraded():
         index=pd.bdate_range("2022-01-03", periods=25))
     r = H.test_regime_dependent_leverage(tiny, n_perm=200)
     assert r["available"] is False
+
+
+def test_compile_summary(price_df, df_dict, earnings_dates):
+    results = {
+        "leverage_effect": H.test_leverage_effect(price_df),
+        "cross_sector_contagion": H.test_cross_sector_contagion(df_dict),
+        "variance_risk_premium": H.test_variance_risk_premium(price_df),
+        "earnings_vol_premium": H.test_earnings_vol_premium(price_df, earnings_dates, n_permutations=500),
+        "regime_dependent_leverage": H.test_regime_dependent_leverage(price_df, n_perm=500),
+    }
+    summary = H.compile_summary(results)
+    assert list(summary.index) == list(results.keys())
+    assert {"title", "p_value", "effect", "significant"}.issubset(summary.columns)

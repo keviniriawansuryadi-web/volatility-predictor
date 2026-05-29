@@ -291,3 +291,31 @@ def test_regime_dependent_leverage(df: pd.DataFrame, ticker: str = "",
                 statistic=float(obs_diff), p_value=float(p_perm), effect=float(obs_diff),
                 n=int(len(d)), conclusion=conclusion, available=True,
                 leverage_ratios=ratios, extreme_ratio_ci=extreme_ci)
+
+
+def compile_summary(results: dict) -> pd.DataFrame:
+    """Collect ``test_*`` result dicts into a one-row-per-hypothesis table.
+
+    ``results`` maps a key -> the dict returned by a test. Columns:
+    title, p_value, effect, significant. Index = each result's ``hypothesis``.
+    """
+    rows = []
+    for key, r in results.items():
+        p = r.get("p_value", np.nan)
+        eff = r.get("effect", np.nan)
+        p_ok = isinstance(p, (int, float)) and not pd.isna(p)
+        eff_ok = isinstance(eff, (int, float)) and not pd.isna(eff)
+        if not r.get("available", True):
+            sig = "n/a (no data)"
+        elif p_ok:
+            sig = "Yes" if p < 0.05 else "No"
+        else:
+            sig = "--"
+        rows.append({
+            "hypothesis": r.get("hypothesis", key),
+            "title": r.get("title", ""),
+            "p_value": f"{p:.4f}" if p_ok else "--",
+            "effect": f"{eff:.3f}" if eff_ok else "--",
+            "significant": sig,
+        })
+    return pd.DataFrame(rows).set_index("hypothesis")
