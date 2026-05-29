@@ -79,3 +79,17 @@ def test_leverage_effect_degraded():
                         index=pd.bdate_range("2022-01-03", periods=3))
     r = H.test_leverage_effect(tiny)
     assert r["available"] is False
+
+
+def test_cross_sector_contagion_contract(df_dict):
+    r = H.test_cross_sector_contagion(df_dict)
+    _assert_contract(r)
+    assert r["hypothesis"] == "cross_sector_contagion"
+
+
+def test_cross_sector_contagion_degraded():
+    one = {"MU": pd.DataFrame(
+        {"realized_vol_21d": np.linspace(0.1, 0.3, 60)},
+        index=pd.bdate_range("2022-01-03", periods=60))}
+    r = H.test_cross_sector_contagion(one)
+    assert r["available"] is False

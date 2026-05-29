@@ -85,3 +85,56 @@ def test_leverage_effect(df: pd.DataFrame, horizon: int = 5) -> dict:
     return dict(hypothesis="leverage_effect", title=title, statistic=float(u),
                 p_value=float(p), effect=float(r), n=int(len(neg) + len(pos)),
                 conclusion=conclusion, available=True)
+
+
+def test_cross_sector_contagion(df_dict: dict, sectors: dict | None = None,
+                                lags: tuple = (1, 3, 5)) -> dict:
+    """Directed Granger-causality matrix over sector-average vol series.
+
+    Aggregates each sector to a mean realized-vol series, builds the min-p
+    Granger matrix over ordered sector pairs (statsmodels grangercausalitytests),
+    and ranks sectors by net contagion (significant outgoing - incoming links).
+    """
+    title = "Cross-sector vol contagion (Granger)"
+    sectors = sectors or DEFAULT_SECTORS
+    sector_vol = {}
+    for name, members in sectors.items():
+        cols = [df_dict[t]["realized_vol_21d"].rename(t) for t in members if t in df_dict]
+        if cols:
+            sector_vol[name] = pd.concat(cols, axis=1).mean(axis=1).rename(name)
+    names = list(sector_vol)
+    if len(names) < 2:
+        return _unavailable("cross_sector_contagion", title,
+                            f"Need >=2 sectors with data, got {len(names)}.")
+
+    pmat = pd.DataFrame(np.nan, index=names, columns=names)
+    for src in names:
+        for tgt in names:
+            if src == tgt:
+                continue
+            data = pd.concat([sector_vol[tgt].rename("y"),
+                              sector_vol[src].rename("x")], axis=1).dropna()
+            if len(data) < 40:
+                continue
+            try:
+                res = grangercausalitytests(data[["y", "x"]], maxlag=max(lags),
+                                            verbose=False)
+                pmat.loc[src, tgt] = min(res[lag][0]["ssr_ftest"][1] for lag in lags)
+            except Exception as exc:  # noqa: BLE001 - report a null, do not raise
+                warnings.warn(f"[contagion] {src}->{tgt} failed: {exc}")
+
+    if not np.isfinite(pmat.values).any():
+        return _unavailable("cross_sector_contagion", title,
+                            "No sector pair had enough overlapping data.")
+
+    sig = pmat < 0.05
+    net = (sig.sum(axis=1) - sig.sum(axis=0)).sort_values(ascending=False)
+    p_min = float(np.nanmin(pmat.values))
+    source = net.index[0]
+    conclusion = (f"Net-contagion ranking (out-in): "
+                  + ", ".join(f"{k}={v:+d}" for k, v in net.items())
+                  + f". Source sector = {source}. min Granger p={p_min:.4f}.")
+    return dict(hypothesis="cross_sector_contagion", title=title, statistic=np.nan,
+                p_value=p_min, effect=float(net.iloc[0]), n=int(len(names)),
+                conclusion=conclusion, available=True,
+                pval_matrix=pmat, net_contagion=net, source_sector=source)
