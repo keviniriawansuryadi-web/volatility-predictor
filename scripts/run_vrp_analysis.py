@@ -26,7 +26,7 @@ warnings.filterwarnings("ignore")
 
 
 from src.data_loader import load_stock_data, load_vix_data
-from src.hypothesis_tests import analyze_variance_risk_premium
+from src.hypotheses import test_variance_risk_premium
 
 TODAY = date.today().isoformat()
 START = (date.today() - timedelta(days=5 * 365)).isoformat()
@@ -42,7 +42,7 @@ if not vix_df.empty:
     df = df.join(vix_df, how="left")
     df[["vix_level", "vix_change"]] = df[["vix_level", "vix_change"]].ffill()
 
-result = analyze_variance_risk_premium(df, ticker="SPY", forward_days=10, plot_dir=PLOT_DIR)
+result = test_variance_risk_premium(df, ticker="SPY", horizon=10)
 
 if result.get("available"):
     print(f"\n{'='*65}")
