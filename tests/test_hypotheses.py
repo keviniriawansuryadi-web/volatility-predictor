@@ -93,3 +93,19 @@ def test_cross_sector_contagion_degraded():
         index=pd.bdate_range("2022-01-03", periods=60))}
     r = H.test_cross_sector_contagion(one)
     assert r["available"] is False
+
+
+def test_variance_risk_premium_contract(price_df):
+    r = H.test_variance_risk_premium(price_df, ticker="TEST", horizon=10)
+    _assert_contract(r)
+    assert r["hypothesis"] == "variance_risk_premium"
+    # VRP-specific extras consumed by scripts/run_vrp_analysis.py
+    for k in ("current_vrp", "current_vix", "current_rv", "current_state",
+              "significant", "neg_mean_fwd_vol", "pos_mean_fwd_vol", "n_negative_vrp"):
+        assert k in r
+
+
+def test_variance_risk_premium_degraded(price_df):
+    no_vix = price_df.drop(columns=["vix_level"])
+    r = H.test_variance_risk_premium(no_vix)
+    assert r["available"] is False

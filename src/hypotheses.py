@@ -138,3 +138,50 @@ def test_cross_sector_contagion(df_dict: dict, sectors: dict | None = None,
                 p_value=p_min, effect=float(net.iloc[0]), n=int(len(names)),
                 conclusion=conclusion, available=True,
                 pval_matrix=pmat, net_contagion=net, source_sector=source)
+
+
+def test_variance_risk_premium(df: pd.DataFrame, ticker: str = "SPY",
+                               horizon: int = 10) -> dict:
+    """Negative variance risk premium (RV > VIX) predicts higher forward vol.
+
+    VRP = vix_level - realized_vol_21d. Splits forward ``horizon``-day vol by
+    VRP sign and compares with scipy.stats.mannwhitneyu (one-sided).
+    Returns the standard contract plus VRP state fields used by the VRP script.
+    """
+    title = "Variance risk premium -> forward vol"
+    if "vix_level" not in df.columns or "realized_vol_21d" not in df.columns:
+        return _unavailable("variance_risk_premium", title,
+                            "Need vix_level and realized_vol_21d columns.")
+    d = df.copy()
+    d["fwd"] = d["log_return"].shift(-horizon).rolling(horizon).std() * np.sqrt(252)
+    d["vrp"] = d["vix_level"] - d["realized_vol_21d"]
+    d = d.dropna(subset=["vrp", "fwd"])
+    neg = d.loc[d["vrp"] < 0, "fwd"].values
+    pos = d.loc[d["vrp"] >= 0, "fwd"].values
+
+    current_vix = float(df["vix_level"].iloc[-1])
+    current_rv = float(df["realized_vol_21d"].iloc[-1])
+    current_vrp = current_vix - current_rv
+    state = "NEGATIVE (RV > VIX)" if current_vrp < 0 else "POSITIVE"
+
+    if len(neg) < 5 or len(pos) < 5:
+        r = _unavailable("variance_risk_premium", title,
+                         f"Too few VRP episodes (neg={len(neg)}, pos={len(pos)}).")
+        r.update(current_vrp=current_vrp, current_vix=current_vix, current_rv=current_rv,
+                 current_state=state, significant=False, neg_mean_fwd_vol=np.nan,
+                 pos_mean_fwd_vol=np.nan, n_negative_vrp=int(len(neg)))
+        return r
+
+    u, p = stats.mannwhitneyu(neg, pos, alternative="greater")
+    r_eff = 1 - 2 * u / (len(neg) * len(pos))
+    neg_mean, pos_mean = float(neg.mean()), float(pos.mean())
+    conclusion = (f"{ticker}: negative-VRP days show {'significantly ' if p < 0.05 else 'not significantly '}"
+                  f"higher next-{horizon}d vol ({neg_mean:.1%} vs {pos_mean:.1%}, "
+                  f"U={u:.0f}, p={p:.4f}, r={r_eff:.3f}).")
+    return dict(hypothesis="variance_risk_premium", title=title, statistic=float(u),
+                p_value=float(p), effect=float(r_eff), n=int(len(neg) + len(pos)),
+                conclusion=conclusion, available=True,
+                current_vrp=current_vrp, current_vix=current_vix, current_rv=current_rv,
+                current_state=state, significant=bool(p < 0.05),
+                neg_mean_fwd_vol=neg_mean, pos_mean_fwd_vol=pos_mean,
+                n_negative_vrp=int(len(neg)))
