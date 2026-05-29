@@ -11,7 +11,7 @@ Core library modules for the volatility predictor.
 | `evaluate.py` | RMSE/MAE/QLIKE metrics, comparison plots, SHAP |
 | `sentiment.py` / `scraper_news.py` | News scraping (8 free sources) and VADER sentiment |
 | `regime.py` / `regime_perf.py` | Volatility regime labelling and persistence analysis |
-| `hypothesis.py` / `hypothesis_tests.py` | Statistical hypothesis tests (H1–H9) |
+| `hypothesis.py` / `hypotheses.py` | Spike-sentiment test + 5 library-backed volatility hypothesis tests |
 | `walk_forward.py` / `validation.py` | Walk-forward CV and model validation |
 | `diagnostics.py` / `eda_plots.py` | Diagnostic reports and exploratory plots |
 | `portfolio.py` / `spillover.py` / `sentiment_decomp.py` / `disagree_backtest.py` | Specialised analyses |
