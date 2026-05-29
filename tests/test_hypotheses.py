@@ -120,3 +120,19 @@ def test_earnings_vol_premium_contract(price_df, earnings_dates):
 def test_earnings_vol_premium_degraded(price_df):
     r = H.test_earnings_vol_premium(price_df, pd.DatetimeIndex([]), n_permutations=500)
     assert r["available"] is False
+
+
+def test_regime_dependent_leverage_contract(price_df):
+    r = H.test_regime_dependent_leverage(price_df, ticker="TEST", n_perm=500)
+    _assert_contract(r)
+    assert r["hypothesis"] == "regime_dependent_leverage"
+    assert "leverage_ratios" in r
+
+
+def test_regime_dependent_leverage_degraded():
+    tiny = pd.DataFrame(
+        {"log_return": np.linspace(-0.01, 0.01, 25),
+         "realized_vol_21d": np.linspace(0.1, 0.2, 25)},
+        index=pd.bdate_range("2022-01-03", periods=25))
+    r = H.test_regime_dependent_leverage(tiny, n_perm=200)
+    assert r["available"] is False

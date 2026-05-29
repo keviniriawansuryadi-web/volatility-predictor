@@ -224,3 +224,70 @@ def test_earnings_vol_premium(df: pd.DataFrame, earnings_dates,
     return dict(hypothesis="earnings_vol_premium", title=title, statistic=obs,
                 p_value=p, effect=obs, n=int(len(ew)), conclusion=conclusion,
                 available=True)
+
+
+def _leverage_ratio(sub: pd.DataFrame) -> float:
+    """neg/pos forward-vol ratio for a regime subset (nan if too few in a side)."""
+    neg = sub.loc[sub["ret"] < 0, "fwd"]
+    pos = sub.loc[sub["ret"] > 0, "fwd"]
+    if len(neg) < 5 or len(pos) < 5:
+        return np.nan
+    return float(neg.mean() / (pos.mean() + 1e-12))
+
+
+def test_regime_dependent_leverage(df: pd.DataFrame, ticker: str = "",
+                                   horizon: int = 5, n_perm: int = 5000,
+                                   seed: int = 42) -> dict:
+    """Does the leverage effect amplify in stressed regimes (Campbell & Hentschel
+    1992)? Computes the neg/pos forward-vol ratio per vol regime, a
+    scipy.stats.bootstrap CI on the Extreme-regime ratio, and a permutation test
+    for Extreme ratio > Low ratio.
+    """
+    title = "Regime-dependent leverage (Extreme vs Low)"
+    fwd = _forward_vol(df, horizon)
+    d = pd.DataFrame({"ret": df["log_return"], "fwd": fwd,
+                      "regime": _regime_series(df)}).dropna()
+    if len(d) < 30:
+        return _unavailable("regime_dependent_leverage", title,
+                            f"Too few observations ({len(d)}).")
+
+    ratios = {r: _leverage_ratio(d[d["regime"] == r]) for r in REGIME_ORDER}
+    if np.isnan(ratios.get("Low", np.nan)) or np.isnan(ratios.get("Extreme", np.nan)):
+        return _unavailable("regime_dependent_leverage", title,
+                            "Low and/or Extreme regime lacks enough neg/pos days.")
+
+    # scipy.stats.bootstrap CI on the Extreme-regime ratio (replaces manual loop).
+    ex = d[d["regime"] == "Extreme"]
+    neg_ex = ex.loc[ex["ret"] < 0, "fwd"].values
+    pos_ex = ex.loc[ex["ret"] > 0, "fwd"].values
+
+    def _ratio_stat(a, b, axis=-1):
+        return np.mean(a, axis=axis) / (np.mean(b, axis=axis) + 1e-12)
+
+    boot = bootstrap((neg_ex, pos_ex), _ratio_stat, n_resamples=2000,
+                     random_state=seed, vectorized=True, method="percentile")
+    extreme_ci = (float(boot.confidence_interval.low),
+                  float(boot.confidence_interval.high))
+
+    # Permutation test: Extreme ratio > Low ratio.
+    obs_diff = ratios["Extreme"] - ratios["Low"]
+    pooled = pd.concat([d[d["regime"] == "Low"], ex])
+    n_ex = len(ex)
+    rng = np.random.default_rng(seed)
+    count = 0
+    for _ in range(n_perm):
+        perm = pooled.sample(frac=1, replace=False, random_state=int(rng.integers(1e9)))
+        ex_p = _leverage_ratio(perm.iloc[:n_ex])
+        lo_p = _leverage_ratio(perm.iloc[n_ex:])
+        if not np.isnan(ex_p) and not np.isnan(lo_p) and (ex_p - lo_p) >= obs_diff:
+            count += 1
+    p_perm = count / n_perm
+
+    ratio_str = ", ".join(f"{k}={v:.2f}" for k, v in ratios.items() if not np.isnan(v))
+    conclusion = (f"{ticker}: leverage ratios [{ratio_str}]. Extreme-Low diff={obs_diff:+.2f}, "
+                  f"permutation p={p_perm:.4f} ({_verdict(p_perm)}). "
+                  f"Extreme-ratio 95% CI [{extreme_ci[0]:.2f}, {extreme_ci[1]:.2f}].")
+    return dict(hypothesis="regime_dependent_leverage", title=title,
+                statistic=float(obs_diff), p_value=float(p_perm), effect=float(obs_diff),
+                n=int(len(d)), conclusion=conclusion, available=True,
+                leverage_ratios=ratios, extreme_ratio_ci=extreme_ci)
