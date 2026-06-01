@@ -204,3 +204,25 @@ def test_h11_degraded(price_df):
     # Missing required sentiment columns -> unavailable.
     one_col = pd.DataFrame({"vader_compound": np.zeros(len(price_df))}, index=price_df.index)
     assert L2.test_sentiment_model_consensus(price_df, one_col, "TEST")["available"] is False
+
+
+def test_h12_contract(price_df, disagreement):
+    r = L2.test_disagreement_persistence(price_df, disagreement, "TEST")
+    _assert_l2_contract(r)
+    assert r["hypothesis"] == "H12"
+
+
+def test_h12_degraded(price_df):
+    short = pd.Series(np.arange(10.0), index=price_df.index[:10])
+    assert L2.test_disagreement_persistence(price_df, short, "TEST")["available"] is False
+
+
+def test_h13_contract(price_df, disagreement):
+    r = L2.test_disagreement_direction(price_df, disagreement, "TEST")
+    _assert_l2_contract(r)
+    assert r["hypothesis"] == "H13"
+
+
+def test_h13_degraded(price_df):
+    short = pd.Series(np.arange(10.0), index=price_df.index[:10])
+    assert L2.test_disagreement_direction(price_df, short, "TEST")["available"] is False
