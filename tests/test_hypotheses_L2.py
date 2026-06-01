@@ -347,3 +347,19 @@ def test_h23_degraded_does_not_raise(price_df, sent):
     r = L2.test_signal_temporal_precedence(price_df.iloc[:15], sent.iloc[:15], tiny_dis, "TEST")
     assert isinstance(r, dict)
     assert "available" in r
+
+
+def test_compile_l2_summary_shape(price_df, sent, df_dict, disagreement,
+                                  earnings_dates_l2, lm_scores):
+    res = {
+        "H9": L2.test_sentiment_asymmetry(price_df, sent, "TEST"),
+        "H15": L2.test_cross_sector_contagion(df_dict),
+        "H16": L2.test_regime_dependent_leverage(price_df, "TEST", n_perm=300),
+        "H20": L2.test_10k_language_change_predicts_regime(price_df, lm_scores, "TEST"),
+    }
+    summary = L2.compile_l2_summary(res)
+    # All 15 rows present (missing hypotheses render as blanks), in H9..H23 order.
+    assert list(summary.index) == [f"H{i}" for i in range(9, 24)]
+    assert {"Extends", "Finding", "p_value", "Effect", "Significant",
+            "Actionable"}.issubset(summary.columns)
+    assert summary.loc["H9", "Significant"] in {"Yes", "No", "n/a (no data)", "--"}
