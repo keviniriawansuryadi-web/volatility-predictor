@@ -322,3 +322,28 @@ def test_h21_degraded():
     short = {"MU": pd.DataFrame({"log_return": np.zeros(50),
                                  "realized_vol_21d": np.linspace(0.1, 0.2, 50)}, index=idx)}
     assert L2.test_topic_specific_risk_prediction(short)["available"] is False
+
+
+def test_h22_contract(price_df, sent, disagreement):
+    r = L2.test_triple_signal_interaction(price_df, sent, disagreement, "TEST")
+    _assert_l2_contract(r)
+    assert r["hypothesis"] == "H22"
+
+
+def test_h22_degraded(price_df, sent):
+    short_dis = pd.Series(np.arange(10.0), index=price_df.index[:10])
+    assert L2.test_triple_signal_interaction(
+        price_df.iloc[:10], sent.iloc[:10], short_dis, "TEST")["available"] is False
+
+
+def test_h23_contract(price_df, sent, disagreement, df_dict):
+    r = L2.test_signal_temporal_precedence(price_df, sent, disagreement, "TEST", df_dict=df_dict)
+    _assert_l2_contract(r)
+    assert r["hypothesis"] == "H23"
+
+
+def test_h23_degraded_does_not_raise(price_df, sent):
+    tiny_dis = pd.Series(np.arange(15.0), index=price_df.index[:15])
+    r = L2.test_signal_temporal_precedence(price_df.iloc[:15], sent.iloc[:15], tiny_dis, "TEST")
+    assert isinstance(r, dict)
+    assert "available" in r
