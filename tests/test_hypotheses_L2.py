@@ -133,3 +133,31 @@ def test_steiger_antisymmetric_in_first_two_args():
 def test_steiger_small_n_returns_nan():
     z, p = L2.steiger_dependent_corr(0.5, 0.2, 0.3, 3)
     assert np.isnan(z) and np.isnan(p)
+
+
+def test_srh_structure_and_degrees_of_freedom():
+    rng = np.random.default_rng(0)
+    n = 200
+    a = rng.choice(["lo", "hi"], n)
+    b = rng.choice(["x", "y"], n)
+    resp = (a == "hi") * 5.0 + rng.normal(0, 1, n)
+    d = pd.DataFrame({"resp": resp, "A": a, "B": b})
+    out = L2.scheirer_ray_hare(d, "resp", "A", "B")
+    assert list(out.index) == ["A", "B", "interaction"]
+    assert {"H", "df", "p_value"}.issubset(out.columns)
+    assert out.loc["A", "df"] == 1
+    assert out.loc["B", "df"] == 1
+    assert out.loc["interaction", "df"] == 1
+    assert out["p_value"].dropna().between(0.0, 1.0).all()
+
+
+def test_srh_detects_strong_main_effect_only():
+    rng = np.random.default_rng(1)
+    n = 300
+    a = rng.choice(["lo", "hi"], n)
+    b = rng.choice(["x", "y"], n)
+    resp = (a == "hi") * 6.0 + rng.normal(0, 1, n)  # driven by A only
+    d = pd.DataFrame({"resp": resp, "A": a, "B": b})
+    out = L2.scheirer_ray_hare(d, "resp", "A", "B")
+    assert out.loc["A", "p_value"] < 0.05
+    assert out.loc["B", "p_value"] > 0.05
