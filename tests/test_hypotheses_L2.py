@@ -226,3 +226,26 @@ def test_h13_contract(price_df, disagreement):
 def test_h13_degraded(price_df):
     short = pd.Series(np.arange(10.0), index=price_df.index[:10])
     assert L2.test_disagreement_direction(price_df, short, "TEST")["available"] is False
+
+
+def test_h14_contract(df_dict):
+    r = L2.test_asymmetric_contagion(df_dict)
+    _assert_l2_contract(r)
+    assert r["hypothesis"] == "H14"
+
+
+def test_h14_degraded(df_dict):
+    # Source NVDA absent -> unavailable.
+    no_nvda = {k: v for k, v in df_dict.items() if k != "NVDA"}
+    assert L2.test_asymmetric_contagion(no_nvda)["available"] is False
+
+
+def test_h15_contract(df_dict):
+    r = L2.test_cross_sector_contagion(df_dict)
+    _assert_l2_contract(r)
+    assert r["hypothesis"] == "H15"
+
+
+def test_h15_degraded(df_dict):
+    one_sector = {"MU": df_dict["MU"]}  # <2 sectors
+    assert L2.test_cross_sector_contagion(one_sector)["available"] is False
