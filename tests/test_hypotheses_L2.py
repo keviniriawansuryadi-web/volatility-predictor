@@ -161,3 +161,46 @@ def test_srh_detects_strong_main_effect_only():
     out = L2.scheirer_ray_hare(d, "resp", "A", "B")
     assert out.loc["A", "p_value"] < 0.05
     assert out.loc["B", "p_value"] > 0.05
+
+
+def _tiny():
+    idx = pd.bdate_range("2022-01-03", periods=8)
+    df = pd.DataFrame({"log_return": np.linspace(-0.01, 0.01, 8),
+                       "realized_vol_21d": np.linspace(0.1, 0.2, 8)}, index=idx)
+    sent = pd.DataFrame({c: np.linspace(-0.2, 0.2, 8) for c in
+                         ["vader_compound", "finbert", "textblob", "lm_score"]}, index=idx)
+    return df, sent
+
+
+def test_h9_contract(price_df, sent):
+    r = L2.test_sentiment_asymmetry(price_df, sent, "TEST")
+    _assert_l2_contract(r)
+    assert r["hypothesis"] == "H9"
+
+
+def test_h9_degraded():
+    df, sent = _tiny()
+    assert L2.test_sentiment_asymmetry(df, sent, "TEST")["available"] is False
+
+
+def test_h10_contract(price_df, sent):
+    r = L2.test_sentiment_velocity(price_df, sent, "TEST")
+    _assert_l2_contract(r)
+    assert r["hypothesis"] == "H10"
+
+
+def test_h10_degraded():
+    df, sent = _tiny()
+    assert L2.test_sentiment_velocity(df, sent, "TEST")["available"] is False
+
+
+def test_h11_contract(price_df, sent):
+    r = L2.test_sentiment_model_consensus(price_df, sent, "TEST")
+    _assert_l2_contract(r)
+    assert r["hypothesis"] == "H11"
+
+
+def test_h11_degraded(price_df):
+    # Missing required sentiment columns -> unavailable.
+    one_col = pd.DataFrame({"vader_compound": np.zeros(len(price_df))}, index=price_df.index)
+    assert L2.test_sentiment_model_consensus(price_df, one_col, "TEST")["available"] is False
