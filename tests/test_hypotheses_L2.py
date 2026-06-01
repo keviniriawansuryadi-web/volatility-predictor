@@ -297,3 +297,28 @@ def test_h19_contract(price_df, earnings_dates_l2):
 def test_h19_degraded(price_df):
     two = pd.DatetimeIndex([price_df.index[60], price_df.index[200]])
     assert L2.test_earnings_vol_premium_vs_iv(price_df, two, "TEST")["available"] is False
+
+
+def test_h20_contract(price_df, lm_scores):
+    r = L2.test_10k_language_change_predicts_regime(price_df, lm_scores, "TEST")
+    _assert_l2_contract(r)
+    assert r["hypothesis"] == "H20"
+
+
+def test_h20_degraded(price_df):
+    two = pd.Series([0.1, 0.2], index=price_df.index[[40, 200]])  # <3 filings
+    assert L2.test_10k_language_change_predicts_regime(price_df, two, "TEST")["available"] is False
+
+
+def test_h21_contract(df_dict):
+    r = L2.test_topic_specific_risk_prediction(df_dict)
+    _assert_l2_contract(r)
+    assert r["hypothesis"] == "H21"
+    assert r["proxy"] is True  # no topic_scores supplied -> proxy path
+
+
+def test_h21_degraded():
+    idx = pd.bdate_range("2022-01-03", periods=50)
+    short = {"MU": pd.DataFrame({"log_return": np.zeros(50),
+                                 "realized_vol_21d": np.linspace(0.1, 0.2, 50)}, index=idx)}
+    assert L2.test_topic_specific_risk_prediction(short)["available"] is False
