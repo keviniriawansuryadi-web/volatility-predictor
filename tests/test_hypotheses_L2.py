@@ -109,3 +109,27 @@ def earnings_dates_l2(price_df) -> pd.DatetimeIndex:
 def test_module_exposes_15_tests():
     fns = [f for f in dir(L2) if f.startswith("test_")]
     assert len(fns) == 15
+
+
+def test_steiger_equal_corrs_is_null():
+    z, p = L2.steiger_dependent_corr(0.5, 0.5, 0.3, 100)
+    assert abs(z) < 1e-9
+    assert p == pytest.approx(1.0, abs=1e-9)
+
+
+def test_steiger_large_gap_is_significant():
+    z, p = L2.steiger_dependent_corr(0.7, 0.1, 0.3, 200)
+    assert z > 0
+    assert p < 0.05
+
+
+def test_steiger_antisymmetric_in_first_two_args():
+    z1, p1 = L2.steiger_dependent_corr(0.6, 0.2, 0.3, 150)
+    z2, p2 = L2.steiger_dependent_corr(0.2, 0.6, 0.3, 150)
+    assert z1 == pytest.approx(-z2, abs=1e-9)
+    assert p1 == pytest.approx(p2, abs=1e-9)
+
+
+def test_steiger_small_n_returns_nan():
+    z, p = L2.steiger_dependent_corr(0.5, 0.2, 0.3, 3)
+    assert np.isnan(z) and np.isnan(p)
