@@ -952,9 +952,10 @@ def test_monday_leverage_interaction(df: pd.DataFrame, ticker: str, horizon: int
     d = pd.DataFrame({"fwd": fwd, "ret": df["log_return"]}, index=df.index).dropna()
     d["weekday"] = np.where(d.index.dayofweek == 0, "Monday", "Tue-Fri")
     d["sign"] = np.where(d["ret"] < 0, "Negative", "Positive")
-    if d.groupby(["weekday", "sign"]).size().min() < 5:
+    cell_sizes = d.groupby(["weekday", "sign"]).size()
+    if len(cell_sizes) < 4 or cell_sizes.min() < 5:
         return dict(hypothesis="H17", extends="H5+H6", available=False, p_value=np.nan,
-                    conclusion=f"{ticker}: a weekday x sign cell has <5 obs.",
+                    conclusion=f"{ticker}: a weekday x sign cell is empty or has <5 obs.",
                     actionable="Feature: monday_negative")
 
     srh = scheirer_ray_hare(d, "fwd", "weekday", "sign")

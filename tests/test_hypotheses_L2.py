@@ -249,3 +249,28 @@ def test_h15_contract(df_dict):
 def test_h15_degraded(df_dict):
     one_sector = {"MU": df_dict["MU"]}  # <2 sectors
     assert L2.test_cross_sector_contagion(one_sector)["available"] is False
+
+
+def test_h16_contract(price_df):
+    r = L2.test_regime_dependent_leverage(price_df, "TEST", n_perm=500)
+    _assert_l2_contract(r)
+    assert r["hypothesis"] == "H16"
+    assert "leverage_ratios" in r
+
+
+def test_h16_degraded_does_not_raise(price_df):
+    tiny = price_df.iloc[:25]
+    r = L2.test_regime_dependent_leverage(tiny, "TEST", n_perm=100)
+    assert isinstance(r, dict)
+    assert "available" in r
+
+
+def test_h17_contract(price_df):
+    r = L2.test_monday_leverage_interaction(price_df, "TEST")
+    _assert_l2_contract(r)
+    assert r["hypothesis"] == "H17"
+
+
+def test_h17_degraded(price_df):
+    tiny = price_df.iloc[:8]
+    assert L2.test_monday_leverage_interaction(tiny, "TEST")["available"] is False
