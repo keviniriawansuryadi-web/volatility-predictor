@@ -274,3 +274,26 @@ def test_h17_contract(price_df):
 def test_h17_degraded(price_df):
     tiny = price_df.iloc[:8]
     assert L2.test_monday_leverage_interaction(tiny, "TEST")["available"] is False
+
+
+def test_h18_contract(price_df, sent, earnings_dates_l2):
+    r = L2.test_pre_earnings_sentiment_predicts_spike(price_df, sent, earnings_dates_l2, "TEST")
+    _assert_l2_contract(r)
+    assert r["hypothesis"] == "H18"
+
+
+def test_h18_degraded(price_df, sent):
+    assert L2.test_pre_earnings_sentiment_predicts_spike(
+        price_df, sent, pd.DatetimeIndex([]), "TEST")["available"] is False
+
+
+def test_h19_contract(price_df, earnings_dates_l2):
+    r = L2.test_earnings_vol_premium_vs_iv(price_df, earnings_dates_l2, "TEST")
+    _assert_l2_contract(r)
+    assert r["hypothesis"] == "H19"
+    assert r["proxy_iv"] is True  # no iv_series supplied -> proxy path
+
+
+def test_h19_degraded(price_df):
+    two = pd.DatetimeIndex([price_df.index[60], price_df.index[200]])
+    assert L2.test_earnings_vol_premium_vs_iv(price_df, two, "TEST")["available"] is False
