@@ -415,9 +415,9 @@ def test_h23_degraded_does_not_raise(price_df, sent):
 def test_compile_l2_summary_shape(price_df, sent, df_dict, disagreement,
                                   earnings_dates_l2, lm_scores):
     res = {
-        "H9": L2.test_sentiment_asymmetry(price_df, sent, "TEST"),
+        "H9": L2.test_negative_sentiment_spike_risk(price_df, sent, "TEST"),
         "H15": L2.test_cross_sector_contagion(df_dict),
-        "H16": L2.test_regime_dependent_leverage(price_df, "TEST", n_perm=300),
+        "H16": L2.test_leverage_amplification(price_df, "TEST"),
         "H20": L2.test_10k_language_change_predicts_regime(price_df, lm_scores, "TEST"),
     }
     summary = L2.compile_l2_summary(res)

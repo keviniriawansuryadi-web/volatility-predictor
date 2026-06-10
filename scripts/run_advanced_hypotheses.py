@@ -77,14 +77,14 @@ def assemble_inputs(ticker: str, start: str, end: str) -> dict:
 def run_all(in_: dict, ticker: str) -> dict:
     df, sent = in_["df"], in_["sent"]
     res = {}
-    res["H9"] = L2.test_sentiment_asymmetry(df, sent, ticker)
+    res["H9"] = L2.test_negative_sentiment_spike_risk(df, sent, ticker)
     res["H10"] = L2.test_sentiment_velocity(df, sent, ticker)
     res["H11"] = L2.test_sentiment_model_consensus(df, sent, ticker)
     res["H12"] = L2.test_disagreement_persistence(df, in_["disagree"], ticker)
     res["H13"] = L2.test_disagreement_direction(df, in_["signed"], ticker)
-    res["H14"] = L2.test_asymmetric_contagion(in_["df_dict"])
+    res["H14"] = L2.test_directional_spillover_hub(in_["df_dict"])
     res["H15"] = L2.test_cross_sector_contagion(in_["df_dict"])
-    res["H16"] = L2.test_regime_dependent_leverage(df, ticker)
+    res["H16"] = L2.test_leverage_amplification(df, ticker)
     res["H17"] = L2.test_monday_leverage_interaction(df, ticker)
     res["H18"] = L2.test_pre_earnings_sentiment_predicts_spike(df, sent, in_["earnings"], ticker)
     res["H19"] = L2.test_earnings_vol_premium_vs_iv(df, in_["earnings"], ticker)

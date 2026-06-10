@@ -1609,10 +1609,10 @@ def test_signal_temporal_precedence(df: pd.DataFrame, sent: pd.DataFrame,
 # ============================================================================ #
 
 _FINDING_LABEL = {
-    "H9": "Negative asymmetry", "H10": "Velocity vs level",
+    "H9": "Negative sentiment spike risk", "H10": "Velocity vs level",
     "H11": "Consensus vs single model", "H12": "Disagreement half-life",
-    "H13": "EGARCH = early warning", "H14": "Asymmetric contagion",
-    "H15": "Semi -> Tech contagion", "H16": "Leverage amplifies in Extreme",
+    "H13": "EGARCH = early warning", "H14": "Directional spillover hub",
+    "H15": "Semi -> Tech contagion", "H16": "Leverage amplifies with vol level",
     "H17": "Monday x negative interaction", "H18": "Pre-earnings anxiety -> spike",
     "H19": "Earnings surprise systematic", "H20": "LM delta -> regime shift",
     "H21": "Topic-specific risk ranking", "H22": "Triple threat vol ratio",
