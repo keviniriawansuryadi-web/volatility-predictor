@@ -876,101 +876,94 @@ def test_cross_sector_contagion(df_dict: dict, sectors: dict | None = None,
 #  EXTENDING H5 -- LEVERAGE EFFECT DEPTH (H16, H17)
 # ============================================================================ #
 
-def test_regime_dependent_leverage(df: pd.DataFrame, ticker: str, horizon: int = 5,
-                                   n_perm: int = 5000, seed: int = 42) -> dict:
+def test_leverage_amplification(df: pd.DataFrame, ticker: str, horizon: int = 5) -> dict:
     """
-    H16 (extends H5): Does the leverage effect *amplify* in stressed regimes?
+    H16 (extends H5): Does the leverage effect *amplify continuously* with the vol level?
 
-    H5 confirmed the leverage effect (negative returns -> higher future vol) for
-    all tickers.  This test asks whether it is constant or state-dependent.
-    Within each vol regime (Low/Elevated/High/Extreme) it computes
+    H5 confirmed the leverage effect (negative returns -> higher future vol).  The
+    original H16 bucketed days into discrete regimes and ran out of Extreme-regime
+    observations.  This version keeps the same economic question -- does leverage
+    strengthen under stress? -- but with full-sample power via one interaction
+    regression (HAC standard errors, because overlapping forward windows are
+    autocorrelated):
 
-        leverage_ratio = mean(next-vol | negative return) /
-                         mean(next-vol | positive return)
+        fwd_vol = b0 + b1*neg_mag + b2*pos_mag + b3*(neg_mag x vol_level)
 
-    (1.0 = no effect; 1.5 = negative days bring 50% more forward vol).  It then
-    permutation-tests (n=5000) whether the ratio in the Extreme regime exceeds
-    the ratio in the Low regime, since regime subsamples are small.
+    where ``neg_mag = max(-ret, 0)``, ``pos_mag = max(ret, 0)`` and ``vol_level``
+    is the standardised current 21-day realized vol.  A positive, significant
+    ``b3`` means a negative return adds *more* forward vol when current vol is
+    already high -- the volatility-feedback effect (Campbell & Hentschel 1992).
 
-    Why it matters: if leverage strengthens in Extreme regimes, the danger of a
-    negative return is *not* constant -- this is the volatility-feedback effect
-    (Campbell & Hentschel 1992) and argues for regime-conditional risk
-    parameters rather than a single global leverage coefficient.
+    Why it matters: if leverage scales with the vol level, the danger of a negative
+    return is state-dependent, which argues for a regime-conditional leverage
+    parameter rather than one global coefficient.
 
-    Returns the per-regime leverage ratios with bootstrap CIs, the permutation
-    p-value for Extreme > Low, and a grouped bar chart annotated with the
-    Campbell & Hentschel (1992) reference.
+    Returns the interaction coefficient and HAC p-value, the implied leverage slope
+    at low vs high vol level, the descriptive per-regime neg/pos vol ratios, and a
+    bar chart of those ratios annotated with Campbell & Hentschel (1992).
     """
-    _print_header("H16", "Regime-dependent leverage (permutation)", "H5")
-    fwd = _ensure_fwd_vol(df, horizon)
+    _print_header("H16", "Leverage amplification with vol level (HAC interaction)", "H5")
+    import statsmodels.api as sm
+
+    fwd = _ensure_fwd_vol(df, horizon).rename("fwd")
     d = pd.DataFrame({"ret": df["log_return"], "fwd": fwd,
-                      "regime": _regime_series(df)}).dropna()
+                      "vol": df["realized_vol_21d"], "regime": _regime_series(df)}).dropna()
 
+    # Descriptive per-regime ratios (kept for the contract + bar chart).
     def _ratio(sub):
         neg = sub.loc[sub["ret"] < 0, "fwd"]
         pos = sub.loc[sub["ret"] > 0, "fwd"]
         if len(neg) < 5 or len(pos) < 5:
             return np.nan
-        return neg.mean() / (pos.mean() + 1e-12)
+        return float(neg.mean() / (pos.mean() + 1e-12))
+    leverage_ratios = {r_name: _ratio(d[d["regime"] == r_name]) for r_name in REGIME_ORDER}
 
-    ratios, cis = {}, {}
-    rng = np.random.default_rng(seed)
-    for r_name in REGIME_ORDER:
-        sub = d[d["regime"] == r_name]
-        ratio = _ratio(sub)
-        ratios[r_name] = ratio
-        if not np.isnan(ratio) and len(sub) >= 20:
-            boot = []
-            for _ in range(1000):
-                bs = sub.sample(len(sub), replace=True, random_state=rng.integers(1e9))
-                boot.append(_ratio(bs))
-            boot = np.array([b for b in boot if not np.isnan(b)])
-            cis[r_name] = tuple(np.percentile(boot, [2.5, 97.5])) if boot.size else (np.nan, np.nan)
-        else:
-            cis[r_name] = (np.nan, np.nan)
+    if len(d) < 50 or d["vol"].std() == 0:
+        return dict(hypothesis="H16", extends="H5", available=False, p_value=np.nan,
+                    leverage_ratios=leverage_ratios,
+                    conclusion=f"{ticker}: only {len(d)} aligned obs (need >=50).",
+                    actionable="Regime-conditional leverage param")
 
-    # Permutation test: Extreme ratio > Low ratio.
-    sub_lo = d[d["regime"] == "Low"]
-    sub_ex = d[d["regime"] == "Extreme"]
-    p_perm, obs_diff = np.nan, np.nan
-    if not np.isnan(ratios.get("Low", np.nan)) and not np.isnan(ratios.get("Extreme", np.nan)):
-        obs_diff = ratios["Extreme"] - ratios["Low"]
-        pooled = pd.concat([sub_lo.assign(g="Low"), sub_ex.assign(g="Extreme")])
-        n_ex = len(sub_ex)
-        count = 0
-        for _ in range(n_perm):
-            perm = pooled.sample(frac=1, replace=False, random_state=rng.integers(1e9))
-            ex_p = _ratio(perm.iloc[:n_ex])
-            lo_p = _ratio(perm.iloc[n_ex:])
-            if not np.isnan(ex_p) and not np.isnan(lo_p) and (ex_p - lo_p) >= obs_diff:
-                count += 1
-        p_perm = count / n_perm
+    d["neg_mag"] = (-d["ret"]).clip(lower=0)
+    d["pos_mag"] = d["ret"].clip(lower=0)
+    d["volz"] = (d["vol"] - d["vol"].mean()) / (d["vol"].std() + 1e-12)
+    d["neg_x_vol"] = d["neg_mag"] * d["volz"]
+    X = sm.add_constant(d[["neg_mag", "pos_mag", "volz", "neg_x_vol"]])
+    ols = sm.OLS(d["fwd"], X).fit(cov_type="HAC", cov_kwds={"maxlags": horizon})
 
-    ratio_str = ", ".join(f"{k}={v:.2f}" for k, v in ratios.items() if not np.isnan(v))
+    b_int = float(ols.params["neg_x_vol"])
+    p_two = float(ols.pvalues["neg_x_vol"])
+    p_one = p_two / 2 if b_int > 0 else 1 - p_two / 2
+    b_neg = float(ols.params["neg_mag"])
+    lo_z, hi_z = float(np.percentile(d["volz"], 20)), float(np.percentile(d["volz"], 80))
+    slope_lo, slope_hi = b_neg + b_int * lo_z, b_neg + b_int * hi_z
+
+    ratio_str = ", ".join(f"{k}={v:.2f}" for k, v in leverage_ratios.items()
+                          if not np.isnan(v)) or "n/a"
     conclusion = (
-        f"{ticker}: leverage ratios by regime [{ratio_str}]. "
-        f"Extreme-vs-Low diff={obs_diff:.2f}, permutation p={p_perm:.4f} ({_verdict(p_perm)}). "
-        f"{'Leverage amplifies under stress (Campbell & Hentschel 1992).' if (isinstance(p_perm, float) and p_perm < 0.05) else 'No significant amplification.'}"
+        f"{ticker}: leverage x vol-level interaction b={b_int:+.3f} "
+        f"(one-sided p={p_one:.4f}, {_verdict(p_one)}). Implied neg-return slope "
+        f"low-vol={slope_lo:.2f} -> high-vol={slope_hi:.2f}. "
+        f"Per-regime neg/pos ratios [{ratio_str}]. "
+        f"{'Leverage amplifies with the vol level (Campbell & Hentschel 1992).' if (b_int > 0 and p_one < 0.05) else 'No significant amplification.'}"
     )
     print(f"  {conclusion}")
 
-    present = [r for r in REGIME_ORDER if not np.isnan(ratios.get(r, np.nan))]
+    present = [r for r in REGIME_ORDER if not np.isnan(leverage_ratios.get(r, np.nan))]
     fig = go.Figure(go.Bar(
-        x=present, y=[ratios[r] for r in present],
-        error_y=dict(type="data", symmetric=False,
-                     array=[cis[r][1] - ratios[r] if not np.isnan(cis[r][1]) else 0 for r in present],
-                     arrayminus=[ratios[r] - cis[r][0] if not np.isnan(cis[r][0]) else 0 for r in present]),
+        x=present, y=[leverage_ratios[r] for r in present],
         marker_color=["#3498db", "#f39c12", "#e67e22", "#c0392b"][:len(present)]))
     fig.add_hline(y=1.0, line_dash="dash", line_color="gray",
                   annotation_text="no leverage effect")
     fig.add_annotation(text="Volatility-feedback effect (Campbell & Hentschel 1992)",
                        xref="paper", yref="paper", x=0.5, y=-0.18, showarrow=False,
                        font=dict(size=10, color="gray"))
-    fig.update_layout(title=f"H16 - {ticker}: Leverage Ratio by Vol Regime "
-                            f"(Extreme>Low perm p={p_perm:.4f})",
+    fig.update_layout(title=f"H16 - {ticker}: Leverage Ratio by Regime "
+                            f"(interaction b={b_int:+.3f}, p={p_one:.4f})",
                       xaxis_title="Vol regime", yaxis_title="neg/pos forward-vol ratio")
-    return dict(hypothesis="H16", extends="H5", available=True, statistic=obs_diff,
-                p_value=p_perm, effect=obs_diff, leverage_ratios=ratios,
+    return dict(hypothesis="H16", extends="H5", available=True, statistic=b_int,
+                p_value=p_one, effect=b_int, leverage_ratios=leverage_ratios,
+                slope_low_vol=slope_lo, slope_high_vol=slope_hi,
                 conclusion=conclusion, actionable="Regime-conditional leverage param",
                 figure=fig)
 

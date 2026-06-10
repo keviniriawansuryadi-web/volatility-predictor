@@ -297,7 +297,7 @@ def test_h15_degraded(df_dict):
 
 
 def test_h16_contract(price_df):
-    r = L2.test_regime_dependent_leverage(price_df, "TEST", n_perm=500)
+    r = L2.test_leverage_amplification(price_df, "TEST")
     _assert_l2_contract(r)
     assert r["hypothesis"] == "H16"
     assert "leverage_ratios" in r
@@ -305,9 +305,27 @@ def test_h16_contract(price_df):
 
 def test_h16_degraded_does_not_raise(price_df):
     tiny = price_df.iloc[:25]
-    r = L2.test_regime_dependent_leverage(tiny, "TEST", n_perm=100)
+    r = L2.test_leverage_amplification(tiny, "TEST")
     assert isinstance(r, dict)
     assert "available" in r
+    assert "leverage_ratios" in r
+
+
+def test_h16_detects_amplification():
+    # fwd vol = base + slope * neg_mag * vol_level  -> positive interaction.
+    rng = np.random.default_rng(2)
+    n = 600
+    idx = pd.bdate_range("2020-01-02", periods=n)
+    ret = rng.normal(0, 0.02, n)
+    vol = 0.2 + 0.3 * (np.sin(np.linspace(0, 12, n)) + 1)   # ranges ~0.2..0.8
+    neg_mag = np.clip(-ret, 0, None)
+    fwd = 0.2 + 5.0 * neg_mag * vol + rng.normal(0, 0.01, n)
+    df = pd.DataFrame({"log_return": ret, "realized_vol_21d": vol,
+                       "realized_vol_5d": fwd}, index=idx)
+    r = L2.test_leverage_amplification(df, "TEST")
+    assert r["available"] is True
+    assert r["statistic"] > 0          # interaction coefficient positive
+    assert r["p_value"] < 0.05
 
 
 def test_h17_contract(price_df):
