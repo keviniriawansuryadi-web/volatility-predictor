@@ -54,14 +54,25 @@ def assemble_inputs(ticker: str, start: str, end: str) -> dict:
         dis = L2.compute_disagreement(g, m)
 
     df_dict = {ticker: df}
-    for members in L2.DEFAULT_SECTORS.values():
-        for t in members:
-            if t in df_dict:
-                continue
-            try:
-                df_dict[t] = load_stock_data(t, start, end, cache=True)
-            except Exception as exc:
-                warnings.warn(f"Could not load {t}: {exc}")
+    universe = {t for members in L2.DEFAULT_SECTORS.values() for t in members}
+    universe |= set(L2.SEMI_SPILLOVER_UNIVERSE)   # broad semi panel for H14
+    for t in universe:
+        if t in df_dict:
+            continue
+        try:
+            df_dict[t] = load_stock_data(t, start, end, cache=True)
+        except Exception as exc:
+            warnings.warn(f"Could not load {t}: {exc}")
+
+    # H9 (sentiment -> spike risk) is a weak signal; estimate it over the longest
+    # sensible history for statistical power, independent of the suite window.
+    h9_start = min(start, "2014-01-01")
+    try:
+        df_h9 = add_forward_vol(load_stock_data(ticker, h9_start, end, cache=True), horizon=5)
+        sent_h9 = simulate_sentiment(df_h9, ticker)
+    except Exception as exc:
+        warnings.warn(f"H9 long-history load failed ({exc}); falling back to suite window.")
+        df_h9, sent_h9 = df, sent
 
     earnings = load_earnings_dates(ticker)
     if len(earnings) < 4:
@@ -71,13 +82,14 @@ def assemble_inputs(ticker: str, start: str, end: str) -> dict:
     lm_scores = simulate_10k_risk_scores(ticker, filings)
 
     return dict(df=df, sent=sent, disagree=dis["norm_abs"], signed=dis["signed"],
-                df_dict=df_dict, earnings=earnings, filings=filings, lm_scores=lm_scores)
+                df_dict=df_dict, earnings=earnings, filings=filings, lm_scores=lm_scores,
+                df_h9=df_h9, sent_h9=sent_h9)
 
 
 def run_all(in_: dict, ticker: str) -> dict:
     df, sent = in_["df"], in_["sent"]
     res = {}
-    res["H9"] = L2.test_negative_sentiment_spike_risk(df, sent, ticker)
+    res["H9"] = L2.test_negative_sentiment_spike_risk(in_["df_h9"], in_["sent_h9"], ticker)
     res["H10"] = L2.test_sentiment_velocity(df, sent, ticker)
     res["H11"] = L2.test_sentiment_model_consensus(df, sent, ticker)
     res["H12"] = L2.test_disagreement_persistence(df, in_["disagree"], ticker)

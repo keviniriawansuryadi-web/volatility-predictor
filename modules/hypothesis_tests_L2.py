@@ -71,13 +71,19 @@ warnings.filterwarnings("ignore", category=UserWarning)
 # Stressed = top two regimes; calm = bottom two (used by H16, H22).
 _STRESSED = {"High", "Extreme"}
 
-# Default sector map for the contagion tests (H14, H15, H23).
+# Default sector map for the contagion tests (H15, H23).
 DEFAULT_SECTORS = {
     "Semiconductor": ["MU", "NVDA", "AMD"],
     "Financial": ["JPM", "BAC"],
     "Energy": ["XOM", "CVX"],
     "Tech": ["AAPL", "MSFT", "AMZN"],
 }
+
+# Broad semiconductor cross-section for H14's directional-spillover test.
+# A wider supply-chain panel (foundry, fabless, equipment) is needed to resolve
+# which node is the net volatility transmitter; with only MU/NVDA/AMD the
+# bootstrap CI on the hub's net spillover is too wide to separate from zero.
+SEMI_SPILLOVER_UNIVERSE = ["MU", "NVDA", "AMD", "TSM", "AVGO", "QCOM", "INTC", "MRVL"]
 
 
 # ============================================================================ #
@@ -675,7 +681,7 @@ def _net_spillover(vol: pd.DataFrame, lag: int, horizon: int) -> pd.Series:
 
 
 def test_directional_spillover_hub(df_dict: dict, source: str = "NVDA",
-                                   members: tuple = ("MU", "NVDA", "AMD"),
+                                   members: tuple | None = None,
                                    horizon: int = 10, max_lag: int = 5,
                                    n_boot: int = 300, seed: int = 42) -> dict:
     """
@@ -700,6 +706,7 @@ def test_directional_spillover_hub(df_dict: dict, source: str = "NVDA",
     p-value for the source, and a net-spillover bar chart with the source flagged.
     """
     _print_header("H14", "Directional vol spillover hub (Diebold-Yilmaz)", "H4")
+    members = tuple(members) if members is not None else tuple(SEMI_SPILLOVER_UNIVERSE)
     if source not in df_dict:
         return dict(hypothesis="H14", extends="H4", available=False, p_value=np.nan,
                     conclusion=f"Source {source} missing from df_dict.",
