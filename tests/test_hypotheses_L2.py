@@ -248,15 +248,41 @@ def test_h13_degraded(price_df):
 
 
 def test_h14_contract(df_dict):
-    r = L2.test_asymmetric_contagion(df_dict)
+    r = L2.test_directional_spillover_hub(df_dict, n_boot=80)
     _assert_l2_contract(r)
     assert r["hypothesis"] == "H14"
+    assert "net_spillover" in r
 
 
 def test_h14_degraded(df_dict):
     # Source NVDA absent -> unavailable.
     no_nvda = {k: v for k, v in df_dict.items() if k != "NVDA"}
-    assert L2.test_asymmetric_contagion(no_nvda)["available"] is False
+    assert L2.test_directional_spillover_hub(no_nvda)["available"] is False
+
+
+def test_h14_identifies_lead_asset_as_hub():
+    # NVDA leads; MU and AMD are lagged copies of NVDA vol + noise.
+    rng = np.random.default_rng(1)
+    n = 320
+    idx = pd.bdate_range("2021-01-04", periods=n)
+    nv = pd.Series(np.abs(rng.normal(0, 1, n)).cumsum() % 5 + 1, index=idx)
+    nv = nv.rolling(5).mean().bfill()
+
+    def lagged(shift, noise):
+        return nv.shift(shift).bfill() + rng.normal(0, noise, n)
+
+    df_dict = {
+        "NVDA": pd.DataFrame({"log_return": rng.normal(0, 0.01, n),
+                              "realized_vol_21d": nv}, index=idx),
+        "MU": pd.DataFrame({"log_return": rng.normal(0, 0.01, n),
+                            "realized_vol_21d": lagged(2, 0.2)}, index=idx),
+        "AMD": pd.DataFrame({"log_return": rng.normal(0, 0.01, n),
+                             "realized_vol_21d": lagged(3, 0.2)}, index=idx),
+    }
+    r = L2.test_directional_spillover_hub(df_dict, n_boot=80)
+    assert r["available"] is True
+    net = r["net_spillover"]
+    assert net.idxmax() == "NVDA"     # the lead asset is the net source
 
 
 def test_h15_contract(df_dict):

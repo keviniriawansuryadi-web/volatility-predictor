@@ -646,104 +646,130 @@ def test_disagreement_direction(df: pd.DataFrame, disagreement: pd.Series,
 
 
 # ============================================================================ #
-#  EXTENDING H4 -- SECTOR CONTAGION (H14, H15)
+#  EXTENDING H4 -- DIRECTIONAL SPILLOVER (H14, H15)
 # ============================================================================ #
 
-def test_asymmetric_contagion(df_dict: dict, source: str = "NVDA",
-                              targets: tuple = ("MU", "AMD"),
-                              lags: tuple = (1, 2, 3, 5)) -> dict:
+def _net_spillover(vol: pd.DataFrame, lag: int, horizon: int) -> pd.Series:
+    """Diebold-Yilmaz net directional spillover (generalized FEVD, Pesaran-Shin).
+
+    ``vol`` is a (T x k) frame of vol series. Returns a Series of net spillover
+    (TO others - FROM others, in connectedness %) indexed by column name.
     """
-    H14 (extends H4): Does *negative* vol contagion spread faster than positive?
+    from statsmodels.tsa.api import VAR
+    res = VAR(vol).fit(lag)
+    Sigma = np.asarray(res.sigma_u)
+    k = Sigma.shape[0]
+    Phi = res.ma_rep(maxn=horizon - 1)          # (horizon, k, k), Phi[0] = I
+    sig = np.diag(Sigma)
+    theta = np.zeros((k, k))
+    for i in range(k):
+        denom = sum((Phi[h] @ Sigma @ Phi[h].T)[i, i] for h in range(horizon))
+        for j in range(k):
+            num = sum((Phi[h] @ Sigma)[i, j] ** 2 for h in range(horizon))
+            theta[i, j] = (num / sig[j]) / denom if denom > 0 else 0.0
+    row_sum = theta.sum(axis=1, keepdims=True)
+    theta_n = np.divide(theta, row_sum, out=np.zeros_like(theta), where=row_sum > 0) * 100.0
+    to_others = theta_n.sum(axis=0) - np.diag(theta_n)      # column sums (i -> others)
+    from_others = theta_n.sum(axis=1) - np.diag(theta_n)    # row sums (others -> i)
+    return pd.Series(to_others - from_others, index=vol.columns)
 
-    H4 confirmed NVDA vol spills over to MU and AMD.  Contagion is rarely
-    symmetric -- panic spreads faster than calm (Forbes & Rigobon 2002).  This
-    test separates NVDA daily vol changes into positive shocks (> +1 std) and
-    negative shocks (< -1 std) and measures the response in each target's vol at
-    lags 1/2/3/5.  Asymmetry is tested with the interaction regression
 
-        target_vol_change = a + b1 * NVDA_shock + b2 * NVDA_shock * negative_dummy
-
-    where a significant, sign-consistent ``b2`` means negative shocks transmit
-    more strongly than positive ones.
-
-    Why it matters: if contagion is asymmetric, a sector risk model should weight
-    *negative* lead-asset shocks more heavily than positive ones.
-
-    Returns b1, b2 and their p-values per target, plus a dual impulse-response
-    plot (positive vs negative NVDA shock) of the average target response.
+def test_directional_spillover_hub(df_dict: dict, source: str = "NVDA",
+                                   members: tuple = ("MU", "NVDA", "AMD"),
+                                   horizon: int = 10, max_lag: int = 5,
+                                   n_boot: int = 300, seed: int = 42) -> dict:
     """
-    _print_header("H14", "Asymmetric vol contagion (interaction regression)", "H4")
-    import statsmodels.api as sm
+    H14 (extends H4): Is the lead asset the directional volatility *hub*?
+
+    H4 confirmed NVDA vol spills over to MU and AMD.  The original H14 tested a
+    single one-day-lead sign asymmetry and was underpowered.  This version uses
+    the Diebold & Yilmaz (2012) connectedness framework: a VAR on the members'
+    realized vol, a generalized (order-invariant) forecast-error variance
+    decomposition at ``horizon`` steps, and the *net directional spillover* per
+    ticker (share transmitted TO others minus share received FROM others).
+
+    The hub is the ticker with the highest net spillover.  A moving-block
+    bootstrap (resampling rows in blocks, recomputing the net spillover) gives a
+    one-sided p-value that the ``source``'s net spillover exceeds zero -- i.e. it
+    is a *net transmitter*, not a receiver.
+
+    Why it matters: if one ticker is the systemic source, its lagged vol is a
+    cross-ticker lead feature for the others' forecasts.
+
+    Returns the net-spillover vector, the total connectedness index, the bootstrap
+    p-value for the source, and a net-spillover bar chart with the source flagged.
+    """
+    _print_header("H14", "Directional vol spillover hub (Diebold-Yilmaz)", "H4")
     if source not in df_dict:
         return dict(hypothesis="H14", extends="H4", available=False, p_value=np.nan,
                     conclusion=f"Source {source} missing from df_dict.",
-                    actionable="Negative-shock weight")
+                    actionable="Cross-ticker spillover feature (lead from hub)")
 
-    src_vol = df_dict[source]["realized_vol_21d"].dropna()
-    src_chg = src_vol.diff()
-    sd = src_chg.std()
-    shock = src_chg.copy()
-    neg_dummy = (src_chg < 0).astype(int)
-
-    per_target = {}
-    irf = {}
-    for tgt in targets:
-        if tgt not in df_dict:
-            continue
-        tgt_chg = df_dict[tgt]["realized_vol_21d"].dropna().diff()
-        # Use 1-day lead response in the regression; report IRF over all lags.
-        reg = pd.DataFrame({
-            "y": tgt_chg.shift(-1),
-            "shock": shock,
-            "shock_neg": shock * neg_dummy,
-        }).dropna()
-        if len(reg) < 30:
-            continue
-        X = sm.add_constant(reg[["shock", "shock_neg"]])
-        model = sm.OLS(reg["y"], X).fit()
-        per_target[tgt] = {
-            "b1": float(model.params["shock"]), "p1": float(model.pvalues["shock"]),
-            "b2": float(model.params["shock_neg"]), "p2": float(model.pvalues["shock_neg"]),
-        }
-        pos_evt = src_chg[src_chg > sd].index
-        neg_evt = src_chg[src_chg < -sd].index
-        tgt_vol = df_dict[tgt]["realized_vol_21d"]
-        pos_resp = [tgt_vol.shift(-lag).reindex(pos_evt).mean()
-                    - tgt_vol.reindex(pos_evt).mean() for lag in lags]
-        neg_resp = [tgt_vol.shift(-lag).reindex(neg_evt).mean()
-                    - tgt_vol.reindex(neg_evt).mean() for lag in lags]
-        irf[tgt] = {"pos": pos_resp, "neg": neg_resp}
-
-    if not per_target:
+    cols = [df_dict[t]["realized_vol_21d"].rename(t) for t in members
+            if t in df_dict and "realized_vol_21d" in df_dict[t].columns]
+    vol = pd.concat(cols, axis=1).dropna() if cols else pd.DataFrame()
+    if vol.shape[1] < 2 or source not in vol.columns or len(vol) < 60:
         return dict(hypothesis="H14", extends="H4", available=False, p_value=np.nan,
-                    conclusion="No targets had enough data.",
-                    actionable="Negative-shock weight")
+                    conclusion=f"Insufficient overlapping vol history "
+                               f"({vol.shape if len(vol) else 'empty'}).",
+                    actionable="Cross-ticker spillover feature (lead from hub)")
 
-    p_min = min(v["p2"] for v in per_target.values())
-    parts = "; ".join(f"{t}: b1={v['b1']:.3f}(p={v['p1']:.3f}), "
-                      f"b2={v['b2']:.3f}(p={v['p2']:.3f})" for t, v in per_target.items())
-    asym = any(v["b2"] > 0 and v["p2"] < 0.05 for v in per_target.values())
-    conclusion = (f"{source}->{list(per_target)}: {parts}. "
-                  f"{'Negative contagion is significantly stronger (Forbes & Rigobon 2002).' if asym else 'No significant asymmetry.'}")
+    # Lag by AIC (capped), fallback to 1 if selection/fit fails.
+    from statsmodels.tsa.api import VAR
+    try:
+        lag = int(VAR(vol).select_order(maxlags=min(max_lag, len(vol) // 10)).aic) or 1
+    except Exception:
+        lag = 1
+    lag = max(1, min(lag, max_lag))
+    try:
+        net = _net_spillover(vol, lag, horizon)
+    except Exception as exc:
+        return dict(hypothesis="H14", extends="H4", available=False, p_value=np.nan,
+                    conclusion=f"VAR/GFEVD fit failed ({exc}).",
+                    actionable="Cross-ticker spillover feature (lead from hub)")
+
+    # Total connectedness index = mean off-diagonal share (compact summary).
+    total_ci = float(np.clip((net.abs().sum()) / (2 * len(net)) + 50.0, 0, 100))
+
+    # Moving-block bootstrap on net[source].
+    rng = np.random.default_rng(seed)
+    blk = max(5, len(vol) // 20)
+    n = len(vol)
+    boot = []
+    for _ in range(n_boot):
+        starts = rng.integers(0, n - blk, size=int(np.ceil(n / blk)))
+        rows = np.concatenate([np.arange(s, s + blk) for s in starts])[:n]
+        try:
+            b_net = _net_spillover(vol.iloc[rows].reset_index(drop=True), lag, horizon)
+            boot.append(b_net.get(source, np.nan))
+        except Exception:
+            continue
+    boot = np.array([b for b in boot if not np.isnan(b)])
+    p_src = float((boot <= 0).mean()) if boot.size else np.nan
+    src_net = float(net[source])
+    hub = net.idxmax()
+
+    conclusion = (
+        f"Net spillover (% pts): "
+        + ", ".join(f"{k}={v:+.1f}" for k, v in net.sort_values(ascending=False).items())
+        + f". HUB = {hub}; total connectedness={total_ci:.0f}%. "
+        f"{source} net={src_net:+.1f}, bootstrap p={p_src:.4f} ({_verdict(p_src)}). "
+        f"{f'{source} is the net volatility source.' if (src_net > 0 and isinstance(p_src, float) and p_src < 0.05) else 'No significant net-source role.'}"
+    )
     print(f"  {conclusion}")
 
-    fig = make_subplots(rows=1, cols=len(irf),
-                        subplot_titles=[f"{source} -> {t}" for t in irf])
-    for c, (tgt, paths) in enumerate(irf.items(), start=1):
-        fig.add_trace(go.Scatter(x=list(lags), y=paths["pos"], mode="lines+markers",
-                                 line=dict(color="#27ae60"), name="Positive shock",
-                                 showlegend=(c == 1)), row=1, col=c)
-        fig.add_trace(go.Scatter(x=list(lags), y=paths["neg"], mode="lines+markers",
-                                 line=dict(color="#c0392b"), name="Negative shock",
-                                 showlegend=(c == 1)), row=1, col=c)
-        fig.update_xaxes(title_text="Lag (days)", row=1, col=c)
-    fig.update_yaxes(title_text="Target vol response", row=1, col=1)
-    fig.update_layout(title_text=f"H14: Asymmetric Contagion -- {source} Shocks "
-                                 f"(neg interaction p_min={p_min:.4f})")
-    return dict(hypothesis="H14", extends="H4", available=True, statistic=np.nan,
-                p_value=p_min, effect=np.mean([v["b2"] for v in per_target.values()]),
-                per_target=per_target, conclusion=conclusion,
-                actionable="Negative-shock weight in contagion model", figure=fig)
+    order = net.sort_values(ascending=False)
+    fig = go.Figure(go.Bar(
+        x=order.index.tolist(), y=order.values,
+        marker_color=["#c0392b" if t == source else "#7f8c8d" for t in order.index]))
+    fig.add_hline(y=0.0, line_dash="dash", line_color="gray")
+    fig.update_layout(title=f"H14: Net Directional Vol Spillover (Diebold-Yilmaz, "
+                            f"{source} bootstrap p={p_src:.3f})",
+                      xaxis_title="Ticker", yaxis_title="Net spillover (TO - FROM, % pts)")
+    return dict(hypothesis="H14", extends="H4", available=True, statistic=total_ci,
+                p_value=p_src, effect=src_net, net_spillover=net, hub=hub,
+                total_connectedness=total_ci, conclusion=conclusion,
+                actionable="Cross-ticker spillover feature (lead from hub)", figure=fig)
 
 
 def test_cross_sector_contagion(df_dict: dict, sectors: dict | None = None,
