@@ -173,14 +173,33 @@ def _tiny():
 
 
 def test_h9_contract(price_df, sent):
-    r = L2.test_sentiment_asymmetry(price_df, sent, "TEST")
+    r = L2.test_negative_sentiment_spike_risk(price_df, sent, "TEST")
     _assert_l2_contract(r)
     assert r["hypothesis"] == "H9"
 
 
 def test_h9_degraded():
     df, sent = _tiny()
-    assert L2.test_sentiment_asymmetry(df, sent, "TEST")["available"] is False
+    assert L2.test_negative_sentiment_spike_risk(df, sent, "TEST")["available"] is False
+
+
+def test_h9_detects_negative_sentiment_spike_link():
+    # Negative sentiment lifts forward vol, but with overlap (no separation):
+    # fwd_vol = base - slope*vader + noise, so the most-negative days are
+    # enriched among the top-quartile spikes without being perfectly separable.
+    rng = np.random.default_rng(0)
+    n = 320
+    idx = pd.bdate_range("2021-01-04", periods=n)
+    vader = rng.uniform(-1, 1, n)
+    fwd = np.clip(0.30 - 0.25 * vader + rng.normal(0, 0.15, n), 0.01, None)
+    df = pd.DataFrame({"log_return": rng.normal(0, 0.01, n),
+                       "realized_vol_21d": fwd,
+                       "realized_vol_5d": fwd}, index=idx)
+    sent = pd.DataFrame({"vader_compound": vader}, index=idx)
+    r = L2.test_negative_sentiment_spike_risk(df, sent, "TEST")
+    assert r["available"] is True
+    assert r["statistic"] > 0          # log-odds coefficient positive
+    assert r["p_value"] < 0.05
 
 
 def test_h10_contract(price_df, sent):

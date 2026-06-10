@@ -208,84 +208,105 @@ def _print_header(hyp: str, title: str, extends: str) -> None:
 
 
 # ============================================================================ #
-#  EXTENDING H1 -- SENTIMENT ASYMMETRY (H9, H10, H11)
+#  EXTENDING H1 -- SENTIMENT AS A RISK SIGNAL (H9, H10, H11)
 # ============================================================================ #
 
-def test_sentiment_asymmetry(df: pd.DataFrame, sent: pd.DataFrame, ticker: str,
-                             horizon: int = 5) -> dict:
+def test_negative_sentiment_spike_risk(df: pd.DataFrame, sent: pd.DataFrame, ticker: str,
+                                       horizon: int = 5, spike_pct: float = 0.75) -> dict:
     """
-    H9 (extends H1): Is the sentiment->vol relationship *asymmetric*?
+    H9 (extends H1): Are the most-negative sentiment days a leading indicator of vol spikes?
 
-    H1 confirmed that negative sentiment precedes vol spikes.  This test splits
-    days by VADER compound into Negative (< -0.3), Neutral (-0.3..+0.3) and
-    Positive (> +0.3) and compares next-``horizon``-day realized vol across the
-    three groups with a Kruskal-Wallis test, followed by pairwise Dunn post-hoc
-    tests (Negative-Positive, Negative-Neutral, Positive-Neutral).
+    H1 confirmed that negative sentiment precedes vol.  The original H9 tested a
+    *symmetric* three-group mean difference and lost power.  This version tests the
+    directional, tail question H1 actually implies: do the most-negative sentiment
+    days precede vol *spikes* more often than other days?
 
-    Why it matters: if negative sentiment lifts forward vol but positive
-    sentiment does *not* depress it below neutral, then sentiment is a one-sided
-    RISK signal -- useful for detecting danger, useless as a "calm" signal.
-    That asymmetry (markets climb on low vol, crash on high vol -- the leverage
-    effect of H5) argues for engineering ``min(sentiment, 0)`` as a feature
-    rather than the raw score.
+    A spike is a day whose next-``horizon``-day realized vol lands in the top
+    ``spike_pct`` quantile.  The predictor is the negative-sentiment magnitude
+    ``neg = max(-VADER, 0)`` -- the ``min(sentiment, 0)`` feature the original H9
+    proposed, expressed as a magnitude.  A logistic regression ``spike ~ neg``
+    gives the odds ratio for a one-SD rise in negativity, a one-sided p-value
+    (H1: more negativity -> more spikes), and McFadden pseudo-R-squared.
 
-    Returns Kruskal-Wallis p plus all three Dunn pairwise p-values and a
-    three-group violin plot of the forward-vol distributions.
+    Why it matters: if negative sentiment lifts the *probability* of a spike, it is
+    a one-sided RISK signal -- useful for detecting danger -- which justifies
+    engineering ``min(sentiment, 0)`` as a feature rather than the raw score.
+
+    Returns the logistic odds ratio / p-value and a bar chart of spike rate by
+    sentiment tercile with Wilson confidence intervals.
     """
-    _print_header("H9", "Sentiment asymmetry (Kruskal-Wallis + Dunn)", "H1")
+    _print_header("H9", "Negative sentiment -> vol-spike risk (logistic)", "H1")
+    import statsmodels.api as sm
+    from statsmodels.stats.proportion import proportion_confint
+
     fwd = _ensure_fwd_vol(df, horizon).rename("fwd_vol")
-    d = pd.concat([sent["vader_compound"], fwd], axis=1).dropna()
-    d["group"] = np.where(d["vader_compound"] < -0.3, "Negative",
-                          np.where(d["vader_compound"] > 0.3, "Positive", "Neutral"))
-
-    groups = {g: d.loc[d["group"] == g, "fwd_vol"].values
-              for g in ["Negative", "Neutral", "Positive"]}
-    sizes = {g: len(v) for g, v in groups.items()}
-    if min(sizes.values()) < 5:
+    d = pd.concat([sent["vader_compound"].rename("vader"), fwd], axis=1).dropna()
+    if len(d) < 30:
         return dict(hypothesis="H9", extends="H1", available=False, p_value=np.nan,
-                    conclusion=f"{ticker}: a sentiment group has <5 obs {sizes}.",
+                    conclusion=f"{ticker}: only {len(d)} aligned obs.",
                     actionable="Feature: min(sentiment, 0)")
 
-    h_stat, p_kw = stats.kruskal(*groups.values())
-    dunn = (sp.posthoc_dunn(d, val_col="fwd_vol", group_col="group", p_adjust="holm")
-            if sp is not None else pd.DataFrame())
-    p_neg_pos = float(dunn.loc["Negative", "Positive"]) if not dunn.empty else np.nan
-    p_neg_neu = float(dunn.loc["Negative", "Neutral"]) if not dunn.empty else np.nan
-    p_pos_neu = float(dunn.loc["Positive", "Neutral"]) if not dunn.empty else np.nan
+    thr = d["fwd_vol"].quantile(spike_pct)
+    d["spike"] = (d["fwd_vol"] >= thr).astype(int)
+    d["neg"] = (-d["vader"]).clip(lower=0.0)
+    if d["spike"].nunique() < 2 or d["neg"].std() == 0:
+        return dict(hypothesis="H9", extends="H1", available=False, p_value=np.nan,
+                    conclusion=f"{ticker}: no spike variation or constant sentiment.",
+                    actionable="Feature: min(sentiment, 0)")
 
-    means = {g: float(np.mean(v)) for g, v in groups.items()}
-    asym = (means["Negative"] > means["Neutral"]) and (p_neg_pos < 0.05) \
-        and not (means["Positive"] < means["Neutral"] and p_pos_neu < 0.05)
+    neg_z = ((d["neg"] - d["neg"].mean()) / (d["neg"].std() + 1e-12)).rename("neg")
+    X = sm.add_constant(neg_z)
+    try:
+        logit = sm.Logit(d["spike"], X).fit(disp=0)
+    except Exception as exc:  # pragma: no cover - separation / singular fits
+        return dict(hypothesis="H9", extends="H1", available=False, p_value=np.nan,
+                    conclusion=f"{ticker}: logistic fit failed ({exc}).",
+                    actionable="Feature: min(sentiment, 0)")
+
+    coef = float(logit.params["neg"])
+    p_two = float(logit.pvalues["neg"])
+    p_one = p_two / 2 if coef > 0 else 1 - p_two / 2
+    odds_ratio = float(np.exp(coef))
+    pseudo_r2 = float(logit.prsquared)
+
+    # Spike rate by sentiment tercile (Most-negative / Neutral / Most-positive).
+    terc = pd.qcut(d["vader"], 3, labels=["Most-negative", "Neutral", "Most-positive"],
+                   duplicates="drop")
+    rates, los, his, ns = [], [], [], []
+    cats = ["Most-negative", "Neutral", "Most-positive"]
+    for c in cats:
+        sub = d.loc[terc == c, "spike"]
+        k, ntot = int(sub.sum()), int(len(sub))
+        rates.append(k / ntot if ntot else np.nan)
+        lo, hi = proportion_confint(k, ntot, method="wilson") if ntot else (np.nan, np.nan)
+        los.append(lo); his.append(hi); ns.append(ntot)
+
     conclusion = (
-        f"{ticker}: forward vol Negative={means['Negative']:.3f} / "
-        f"Neutral={means['Neutral']:.3f} / Positive={means['Positive']:.3f}. "
-        f"KW H={h_stat:.2f}, p={p_kw:.4f} ({_verdict(p_kw)}). "
-        f"Dunn Neg-Pos p={p_neg_pos:.4f}. "
-        f"{'Asymmetric (risk-only) signal confirmed.' if asym else 'No clean asymmetry.'}"
+        f"{ticker}: P(spike) ~ negativity. OR per +1SD={odds_ratio:.2f} "
+        f"(logit coef={coef:+.3f}, one-sided p={p_one:.4f}, {_verdict(p_one)}), "
+        f"pseudo-R2={pseudo_r2:.3f}. Spike rate Most-neg={rates[0]:.0%} vs "
+        f"Most-pos={rates[2]:.0%}. "
+        f"{'Negative sentiment is a real spike-risk signal.' if (coef > 0 and p_one < 0.05) else 'No significant spike-risk signal.'}"
     )
     print(f"  {conclusion}")
-    if not dunn.empty:
-        print("  Dunn (Holm) pairwise p-values:\n" + dunn.round(4).to_string())
 
-    plot_df = pd.concat([
-        pd.DataFrame({"Forward vol": v, "Sentiment group": g}) for g, v in groups.items()
-    ])
-    fig = px.violin(plot_df, x="Sentiment group", y="Forward vol", color="Sentiment group",
-                    box=True, points=False, category_orders={"Sentiment group":
-                        ["Negative", "Neutral", "Positive"]},
-                    color_discrete_map={"Negative": "#e74c3c", "Neutral": "#95a5a6",
-                                        "Positive": "#27ae60"},
-                    title=f"H9 - {ticker}: Next-{horizon}d Volatility by Sentiment Sign")
-    fig.add_annotation(text=f"KW p={p_kw:.4f} | Dunn Neg-Pos p={p_neg_pos:.4f}",
-                       xref="paper", yref="paper", x=0.5, y=1.06, showarrow=False)
-    fig.update_layout(showlegend=False,
-                      yaxis_title=f"Next-{horizon}d realized vol (annualised)")
-    return dict(hypothesis="H9", extends="H1", available=True, statistic=h_stat,
-                p_value=p_kw, effect=means["Negative"] - means["Positive"],
-                dunn_p_neg_pos=p_neg_pos, dunn_p_neg_neu=p_neg_neu,
-                dunn_p_pos_neu=p_pos_neu, group_means=means,
-                conclusion=conclusion, actionable="Feature: min(sentiment, 0)",
-                figure=fig)
+    fig = go.Figure(go.Bar(
+        x=cats, y=rates,
+        error_y=dict(type="data", symmetric=False,
+                     array=[h - r for h, r in zip(his, rates)],
+                     arrayminus=[r - l for l, r in zip(los, rates)]),
+        marker_color=["#e74c3c", "#95a5a6", "#27ae60"],
+        text=[f"n={n}" for n in ns], textposition="outside"))
+    fig.add_hline(y=1 - spike_pct, line_dash="dot", line_color="gray",
+                  annotation_text="baseline spike rate")
+    fig.update_layout(title=f"H9 - {ticker}: Vol-Spike Rate by Sentiment Tercile "
+                            f"(OR={odds_ratio:.2f}, p={p_one:.4f})",
+                      xaxis_title="Sentiment tercile",
+                      yaxis_title=f"P(next-{horizon}d vol in top {int((1-spike_pct)*100)}%)")
+    return dict(hypothesis="H9", extends="H1", available=True, statistic=coef,
+                p_value=p_one, effect=odds_ratio - 1.0, odds_ratio=odds_ratio,
+                pseudo_r2=pseudo_r2, spike_rates=dict(zip(cats, rates)),
+                conclusion=conclusion, actionable="Feature: min(sentiment, 0)", figure=fig)
 
 
 def test_sentiment_velocity(df: pd.DataFrame, sent: pd.DataFrame, ticker: str,
