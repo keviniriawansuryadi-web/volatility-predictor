@@ -306,7 +306,7 @@ def train_stacking_ensemble(
     except Exception as exc:
         warnings.warn(f"[stacking] Isotonic fit failed: {exc}")
 
-    # --- Fix 3: Regime-specific correction on top of chosen global model ---
+    # --- Choose the global meta-learner (Ridge vs Isotonic) by training MAE ---
     if ridge_train_mae <= iso_train_mae:
         chosen_preds = preds_ridge.copy()
         method = "Ridge"
@@ -314,24 +314,14 @@ def train_stacking_ensemble(
         chosen_preds = preds_iso.copy()
         method = "Isotonic"
 
-    # Regime-specific calibration: for each regime bucket in the eval set,
-    # check if the global prediction has systematic bias and correct it.
-    eval_regimes = _assign_regime(y_test[half:])
-    for regime in ["Low", "Elevated", "High", "Extreme"]:
-        regime_mask_train = _assign_regime(y_train_meta) == regime
-        regime_mask_eval = eval_regimes == regime
-        n_regime = regime_mask_train.sum()
-        if n_regime < 5 or regime_mask_eval.sum() == 0:
-            continue
-        try:
-            regime_ridge = Ridge(alpha=0.5, positive=True)
-            regime_ridge.fit(X_train_meta[regime_mask_train], y_train_meta[regime_mask_train])
-            regime_preds = np.clip(
-                regime_ridge.predict(X_eval_meta[regime_mask_eval]), 0.0, dyn_ceil
-            )
-            chosen_preds[regime_mask_eval] = regime_preds
-        except Exception:
-            pass  # fall back to global model for this regime
+    # NOTE: a per-regime calibration step previously lived here. It bucketed the
+    # *eval* days by `_assign_regime(y_test[half:])` — the true realized vol of
+    # the very days being forecast — and fitted a separate meta-learner per
+    # bucket. That is target leakage: it handed the model the answer's regime,
+    # inflating Corr/Spike_Acc to implausible levels (e.g. Corr≈0.95 while every
+    # base learner sat near 0). It was removed. Regime awareness must come from
+    # information known at prediction time (base forecasts / VIX), never from the
+    # target being predicted. See tests/test_stacking_leakage.py.
 
     model_names = list(aligned.keys())
     coef_labels = model_names + (["vix_regime"] if vix_series is not None else [])
