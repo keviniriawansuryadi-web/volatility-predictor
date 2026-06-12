@@ -104,7 +104,8 @@ def main() -> None:
         disp[col] = disp[col].map(lambda v: f"{v:.3f}")
 
     print("\n" + "=" * 84)
-    print(f"  MODEL LEADERBOARD — median metrics across {n_tickers} tickers (lower QLIKE/RMSE = better)")
+    title = f"  MODEL LEADERBOARD — median metrics across {n_tickers} tickers (lower QLIKE/RMSE = better)"
+    print(title + (f"\n  [{args.label}]" if args.label else ""))
     print("=" * 84)
     print(disp.to_string(index=False))
     print("-" * 84)
@@ -116,9 +117,9 @@ def main() -> None:
           f"({board['RMSE_wins'].max()}/{n_tickers} tickers)")
     print("=" * 84 + "\n")
 
-    OUT_CSV.parent.mkdir(parents=True, exist_ok=True)
-    board.to_csv(OUT_CSV, index=False)
-    print(f"Leaderboard saved: {OUT_CSV}")
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    board.to_csv(args.out, index=False)
+    print(f"Leaderboard saved: {args.out}")
 
 
 if __name__ == "__main__":
